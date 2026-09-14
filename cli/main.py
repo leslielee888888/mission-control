@@ -73,7 +73,7 @@ def _error_detail(response: httpx.Response) -> Any:
 @app.command()
 def version() -> None:
     """Print the CLI version."""
-    typer.echo("missionctl 0.1.0")
+    _print_json({"version": "0.1.0"})
 
 
 @app.command()
@@ -271,6 +271,20 @@ def availability_list() -> None:
         f"{_api_base_url()}/crew/{user_id}/availability",
         headers=_auth_headers(session_data),
     )
+    _print_json(_handle_response(response))
+
+
+# --- crew: org roster (Director/Lead only, PRD §7 "Listing") ---------------
+
+crew_app = typer.Typer(help="Org crew roster (Director/Lead only, FR visibility rules).")
+app.add_typer(crew_app, name="crew")
+
+
+@crew_app.command("list")
+def crew_list() -> None:
+    """List your org's crew_member roster (Director/Lead only)."""
+    session_data = _require_session()
+    response = httpx.get(f"{_api_base_url()}/crew", headers=_auth_headers(session_data))
     _print_json(_handle_response(response))
 
 
