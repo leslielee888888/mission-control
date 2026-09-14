@@ -55,3 +55,14 @@ def get_user(session: Session, org_id: int, user_id: int) -> User | None:
     if user is None or user.org_id != org_id:
         return None
     return user
+
+
+def list_crew_members(session: Session, org_id: int) -> list[User]:
+    """Every ``crew_member``-role user in an org — the candidate pool the
+    matcher's retrieval stage starts from (FR-13). Directors and Mission
+    Leads are never matchable (PRD §10 #11), so they're excluded here rather
+    than filtered out by every caller."""
+    statement = (
+        select(User).where(User.org_id == org_id, User.role == Role.CREW_MEMBER).order_by(User.id)
+    )
+    return list(session.exec(statement).all())
