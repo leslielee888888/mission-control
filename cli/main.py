@@ -401,5 +401,33 @@ def mission_list() -> None:
     _print_json(_handle_response(response))
 
 
+# --- matcher: retrieval + ranking (FR-13) -----------------------------------
+
+match_app = typer.Typer(help="Run the matching engine against a mission (FR-13).")
+app.add_typer(match_app, name="match")
+
+
+@match_app.command("run")
+def match_run(
+    mission_id: int,
+    requirement: int | None = typer.Option(
+        None,
+        "--requirement",
+        help="Match only this requirement id; omit to match every requirement on the mission.",
+    ),
+) -> None:
+    """Run the matcher for a mission: per-requirement ranked candidates with
+    score breakdowns (FR-13). Matches every requirement on the mission by
+    default; pass `--requirement` to match just one."""
+    session_data = _require_session()
+    params = {"requirement_id": requirement} if requirement is not None else {}
+    response = httpx.get(
+        f"{_api_base_url()}/missions/{mission_id}/match",
+        params=params,
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
 if __name__ == "__main__":
     app()
