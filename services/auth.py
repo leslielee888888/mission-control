@@ -19,6 +19,17 @@ from models.user import User, get_user_by_email, get_user_by_id_unscoped
 
 _TOKEN_BYTES = 32
 
+# A precomputed bcrypt hash of a value no real password will ever equal.
+# login() verifies against this when the email doesn't match a user, so
+# bcrypt.checkpw always runs at roughly its normal cost either way — the
+# short-circuit "user is None or not verify_password(...)" would otherwise
+# skip bcrypt entirely for an unknown email, making "wrong password" and
+# "no such user" distinguishable by response time even though the error
+# message is already identical for both (FR-2).
+_DUMMY_PASSWORD_HASH = bcrypt.hashpw(
+    b"timing-parity-dummy-not-a-real-password", bcrypt.gensalt()
+).decode("utf-8")
+
 
 class InvalidCredentialsError(Exception):
     """Email/password didn't match a user.
@@ -59,7 +70,9 @@ def login(session: Session, email: str, password: str) -> tuple[User, str]:
     mismatch.
     """
     user = get_user_by_email(session, email)
-    if user is None or not verify_password(password, user.password_hash):
+    password_hash = user.password_hash if user is not None else _DUMMY_PASSWORD_HASH
+    password_ok = verify_password(password, password_hash)
+    if user is None or not password_ok:
         raise InvalidCredentialsError
     assert user.id is not None  # fetched from the DB: always has a pk
 
