@@ -6,6 +6,7 @@ Run with: ``uvicorn main:app --reload``
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.errors import register_exception_handlers
 from api.routes.assignment import router as assignment_router
@@ -20,6 +21,20 @@ from api.routes.users import router as users_router
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Mission Control API")
+
+    # T8: the showcase SPA (web/) calls this API directly from the browser
+    # (Vite dev server on its own port, e.g. 5173, against uvicorn on
+    # 8000) -- a different origin, so without CORS the browser's preflight
+    # never gets past OPTIONS and every request 405s before auth even runs.
+    # Auth is a bearer token in the Authorization header, not a cookie, so
+    # there's nothing ambient to protect by restricting origins here; kept
+    # wide open (`*`) rather than hardcoding a dev port that'll just drift.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     register_exception_handlers(app)
     app.include_router(health_router)
