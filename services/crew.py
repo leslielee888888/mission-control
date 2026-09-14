@@ -32,6 +32,7 @@ from models.crew_skill import CrewSkill, list_crew_skills, upsert_crew_skill
 from models.enums import Role
 from models.skill import Skill, create_skill, get_skill_by_name, list_skills
 from models.user import User, get_user
+from services.dates import windows_overlap
 
 
 class CrewMemberNotFoundError(Exception):
@@ -166,12 +167,6 @@ def set_crew_skill_proficiency(
     return crew_skill, skill
 
 
-def _windows_overlap(a_start: date, a_end: date, b_start: date, b_end: date) -> bool:
-    """Date-range overlap, inclusive of shared boundary days: two windows
-    that each include the same day count as overlapping (FR-7)."""
-    return a_start <= b_end and b_start <= a_end
-
-
 def add_availability_window(
     session: Session,
     org_id: int,
@@ -185,7 +180,7 @@ def add_availability_window(
     assert user.id is not None
     get_or_create_crew_profile(session, user.id)
     for existing in list_availability_windows(session, user.id):
-        if _windows_overlap(start_date, end_date, existing.start_date, existing.end_date):
+        if windows_overlap(start_date, end_date, existing.start_date, existing.end_date):
             raise OverlappingWindowError(existing)
     window = create_availability_window(
         session, crew_id=user.id, start_date=start_date, end_date=end_date
