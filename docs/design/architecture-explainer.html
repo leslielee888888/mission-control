@@ -616,6 +616,17 @@
       </div>
     </div>
 
+    <div class="decision">
+      <div class="label">Coding constraints</div>
+      <div class="body">
+        <p>Decided up front so the implementing agent isn't guessing mid-task (§8):</p>
+        <p><strong>Synchronous, not async</strong> — plain <code>def</code> route handlers and a synchronous SQLAlchemy session. At this scale (tens of crew, single-digit requests) async buys nothing, and an async SQLite driver is one more thing that can go wrong in a 3–5h build.</p>
+        <p><strong>Type hints everywhere</strong>, checked by the editor as you go — not wired into a separate CI type-check step (<code>mypy</code>/<code>pyright</code>), which would be one more tool to configure without changing what ships.</p>
+        <p><strong><code>ruff</code></strong> for lint and format in one tool, one config file. <strong>No bare <code>except:</code></strong> — every caught exception is handled meaningfully or re-raised, since silently swallowing one is how FR-20's "no stack traces leaked, full detail logged" quietly stops being true.</p>
+        <p><strong>Tests run against a real temporary SQLite database, not mocks</strong> — a fresh DB per test session. Mocking the DB layer would mean the tests prove the mocks behave as expected, not that tenant isolation or the state machine actually hold.</p>
+      </div>
+    </div>
+
   </section>
 
   <section>

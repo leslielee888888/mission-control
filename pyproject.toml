@@ -1,0 +1,22 @@
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = [
+  "E",   # pycodestyle errors
+  "F",   # pyflakes
+  "I",   # import sorting
+  "UP",  # pyupgrade
+  "B",   # bugbear (catches things like bare except, mutable defaults)
+  "SIM", # simplification
+  "N",   # pep8 naming
+]
+ignore = [
+  "B008",  # FastAPI's `Depends(...)` as a default arg is the documented idiom, not a bug
+  "UP042", # SQLModel enum columns want `(str, Enum)`, not `enum.StrEnum` (SQLModel docs' own pattern)
+]
+
+[tool.ruff.format]
+quote-style = "double"
