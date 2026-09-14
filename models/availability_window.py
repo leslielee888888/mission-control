@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import date
 
 from pydantic import model_validator
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Session, SQLModel, select
 
 
 class AvailabilityWindow(SQLModel, table=True):
@@ -26,3 +26,37 @@ class AvailabilityWindow(SQLModel, table=True):
         if self.end_date < self.start_date:
             raise ValueError("end_date must not be before start_date")
         return self
+
+
+def list_availability_windows(session: Session, crew_id: int) -> list[AvailabilityWindow]:
+    statement = (
+        select(AvailabilityWindow)
+        .where(AvailabilityWindow.crew_id == crew_id)
+        .order_by(AvailabilityWindow.start_date)
+    )
+    return list(session.exec(statement).all())
+
+
+def get_availability_window(
+    session: Session, crew_id: int, window_id: int
+) -> AvailabilityWindow | None:
+    """Fetch a window by id, scoped to ``crew_id`` (a crew member can only
+    ever see/remove their own windows — FR-7)."""
+    window = session.get(AvailabilityWindow, window_id)
+    if window is None or window.crew_id != crew_id:
+        return None
+    return window
+
+
+def create_availability_window(
+    session: Session, *, crew_id: int, start_date: date, end_date: date
+) -> AvailabilityWindow:
+    window = AvailabilityWindow(crew_id=crew_id, start_date=start_date, end_date=end_date)
+    session.add(window)
+    session.flush()
+    return window
+
+
+def delete_availability_window(session: Session, window: AvailabilityWindow) -> None:
+    session.delete(window)
+    session.flush()

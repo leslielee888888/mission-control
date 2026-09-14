@@ -111,5 +111,168 @@ def whoami() -> None:
     _print_json(response.json())
 
 
+# --- shared plumbing for every command below this point (T3+) --------------
+
+
+def _require_session() -> dict[str, Any]:
+    session_data = _load_session()
+    if session_data is None:
+        _print_json({"error": "Not logged in. Run `missionctl login <email> <password>`."})
+        raise typer.Exit(code=1)
+    return session_data
+
+
+def _auth_headers(session_data: dict[str, Any]) -> dict[str, str]:
+    return {"Authorization": f"Bearer {session_data['token']}"}
+
+
+def _handle_response(response: httpx.Response) -> Any:
+    """Print+exit on any error status; otherwise return the parsed body (or
+    ``None`` for a body-less response, e.g. a 204)."""
+    if response.status_code >= httpx.codes.BAD_REQUEST:
+        _print_json({"error": _error_detail(response)})
+        raise typer.Exit(code=1)
+    return response.json() if response.content else None
+
+
+# --- profile (FR-4) ---------------------------------------------------------
+
+profile_app = typer.Typer(help="Crew profile self-service (FR-4).")
+app.add_typer(profile_app, name="profile")
+
+
+@profile_app.command("show")
+def profile_show(
+    user_id: int | None = typer.Argument(
+        None, help="Crew member id to view (defaults to yourself)."
+    ),
+) -> None:
+    """View a crew profile: your own, or (Director/Lead) another crew
+    member's in your org, read-only."""
+    session_data = _require_session()
+    target = user_id if user_id is not None else session_data["user"]["id"]
+    response = httpx.get(
+        f"{_api_base_url()}/crew/{target}/profile",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@profile_app.command("update")
+def profile_update(
+    name: str | None = typer.Option(None, help="New display name."),
+    contact: str | None = typer.Option(None, help="New contact info."),
+    bio: str | None = typer.Option(None, help="New bio."),
+) -> None:
+    """Update your own name/contact/bio (PATCH-style: only given fields
+    change)."""
+    session_data = _require_session()
+    user_id = session_data["user"]["id"]
+    payload = {
+        key: value
+        for key, value in {"name": name, "contact": contact, "bio": bio}.items()
+        if value is not None
+    }
+    response = httpx.patch(
+        f"{_api_base_url()}/crew/{user_id}/profile",
+        json=payload,
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+# --- skills: org taxonomy (FR-5) + crew proficiency (FR-6) -----------------
+
+skills_app = typer.Typer(help="Org skill taxonomy and crew skill proficiency (FR-5/FR-6).")
+app.add_typer(skills_app, name="skills")
+
+
+@skills_app.command("add")
+def skills_add(
+    name: str,
+    category: str | None = typer.Option(None, help="Optional free-text category tag."),
+) -> None:
+    """Create an org-scoped skill (Director only)."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/skills",
+        json={"name": name, "category": category},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@skills_app.command("list")
+def skills_list() -> None:
+    """List your org's skill taxonomy."""
+    session_data = _require_session()
+    response = httpx.get(f"{_api_base_url()}/skills", headers=_auth_headers(session_data))
+    _print_json(_handle_response(response))
+
+
+@skills_app.command("set")
+def skills_set(
+    skill: str,
+    proficiency: int,
+    user_id: int | None = typer.Option(
+        None, "--user", help="Crew member id to set on behalf of (Director only)."
+    ),
+) -> None:
+    """Set your own (or, as Director, another crew member's) proficiency
+    (1-5) on an org skill."""
+    session_data = _require_session()
+    target = user_id if user_id is not None else session_data["user"]["id"]
+    response = httpx.put(
+        f"{_api_base_url()}/crew/{target}/skills",
+        json={"skill_name": skill, "proficiency": proficiency},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+# --- availability (FR-7) ----------------------------------------------------
+
+availability_app = typer.Typer(help="Crew availability windows (FR-7).")
+app.add_typer(availability_app, name="availability")
+
+
+@availability_app.command("add")
+def availability_add(start: str, end: str) -> None:
+    """Add an unavailability window (self only), as YYYY-MM-DD dates."""
+    session_data = _require_session()
+    user_id = session_data["user"]["id"]
+    response = httpx.post(
+        f"{_api_base_url()}/crew/{user_id}/availability",
+        json={"start_date": start, "end_date": end},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@availability_app.command("remove")
+def availability_remove(window_id: int) -> None:
+    """Delete an unavailability window (delete-only, no edit)."""
+    session_data = _require_session()
+    user_id = session_data["user"]["id"]
+    response = httpx.delete(
+        f"{_api_base_url()}/crew/{user_id}/availability/{window_id}",
+        headers=_auth_headers(session_data),
+    )
+    _handle_response(response)
+    _print_json({"status": "removed", "id": window_id})
+
+
+@availability_app.command("list")
+def availability_list() -> None:
+    """List your own unavailability windows."""
+    session_data = _require_session()
+    user_id = session_data["user"]["id"]
+    response = httpx.get(
+        f"{_api_base_url()}/crew/{user_id}/availability",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
 if __name__ == "__main__":
     app()
