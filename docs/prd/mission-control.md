@@ -304,9 +304,11 @@ settings, no screens beyond these two — this is a state-management showcase (�
   for models and validation, SQLite as the store, Typer for the CLI (pairs naturally
   with FastAPI's type-hint style and Pydantic schemas), `httpx` for the CLI's HTTP
   client, `pytest` for tests. React + Vite for the showcase SPA (`web/`, FR-21), with a
-  typed client generated from the API's OpenAPI schema for RPC-style DX (§10 #21) and
-  React Query for server state. Matches Mutinex's internal stack (TypeScript, React,
-  Python, GCP).
+  typed client generated from the API's OpenAPI schema for RPC-style DX (§10 #21),
+  React Query for server state, and Tailwind CSS for styling (§10 #25) — utility
+  classes are fast to build 2-3 screens with and skip hand-rolling a component
+  stylesheet nobody will reuse past this showcase. Matches Mutinex's internal stack
+  (TypeScript, React, Python, GCP).
 - **No external infrastructure.** SQLite file, no queue, no cache, no cloud dependency —
   deliberately, given the timebox and "easy to run locally" requirement.
 - **Auth is intentionally minimal.** A real `POST /auth/login` (email + password)
@@ -370,6 +372,7 @@ All resolved via `grill-me` (Discovery grilling, 2026-09-14 — round-by-round r
 | Q22 | SPA authorization endpoint | Whether the browser needs a distinct auth surface from the CLI | Superseded by Q24 — the browser uses the same real login endpoint as the CLI, not a separate mechanism. | Leslie |
 | Q23 | Which roles does the SPA cover? | The domain has three roles with genuinely different views (§4) | All three, conditionally rendered off the logged-in user's role (mirrors API RBAC). Adds a Crew Member "My Assignments" accept/decline screen; first thing cut if time is short (Q14). | Leslie |
 | Q24 | Auth mechanism: tokens vs. real login | Originally scoped as seed-issued static tokens (Q10); reversed after reviewing the shape of the auth flow | Real `POST /auth/login` (email + password), passwords hashed at rest (bcrypt/argon2), returns an opaque bearer token used on subsequent requests — same FR-2 token mechanics, different issuance. One shared model for both CLI (`login <email> <password>`) and SPA. Seed script generates and documents demo passwords. Still fits inside §3's Non-goals boundary — no OAuth/SSO/refresh/reset, just a real login instead of a pre-issued token. | Leslie |
+| Q25 | SPA styling approach | Undecided since FR-21 was added — hand-rolled CSS vs. a utility framework | Tailwind CSS. Fast to build 2-3 screens with utility classes; no component stylesheet to maintain past this showcase, no design-token system to build for something this small. | Leslie |
 
 ## 11. Rollout
 
@@ -447,3 +450,4 @@ Full session transcript: `transcripts/2026-09-14-prd-discovery-grilling.{md,json
 | 5 | Q22 SPA authorization endpoint | (A) Reuse the token-paste model, no new server endpoint | Later reopened and superseded by Q24 |
 | 6 | Q23 Which roles does the SPA cover? | (A) All three, conditionally rendered | Confirmed (A) |
 | 7 | Q24 Auth mechanism | N/A — user-initiated change from tokens to real login | Real `POST /auth/login` (email + password), one shared model for CLI and SPA — supersedes Q10 and Q22 |
+| 8 | Q25 SPA styling approach | N/A — user-initiated addition | Tailwind CSS |
