@@ -525,8 +525,8 @@ Project: [Mission Control](https://github.com/leslielee888888/mission-control/pr
 
 ### T10 — Transcript packaging
 
-- [ ] Every session (main + every subagent, incl. T8's `fe-programmer`) exported unedited to `transcripts/` (§8)
-- [ ] Refresh/add pairs covering everything after the Discovery grilling session
+- [x] Every session (main + every subagent, incl. T8's `fe-programmer`) exported unedited to `transcripts/` (§8) — 19 subagent transcripts (9 build tasks + the mockup review + the 9-agent `/code-review` run on PR #11) plus the full main session, see `transcripts/README.md`
+- [x] Refresh/add pairs covering everything after the Discovery grilling session
 
 ## 13. Refinement log
 
