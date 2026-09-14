@@ -1,7 +1,8 @@
 """The matching engine: retrieval + ranking (T5, FR-13).
 
 Given a mission requirement, find and rank eligible crew. Scope: the matcher
-only — no assignment creation, no propose/accept/decline (that's T6).
+only — no assignment creation, no propose/accept/decline (that's
+``services/assignment.py``, T6).
 
 Two independent stages, per the architecture explainer's "The matcher's
 actual shape" card and ``docs/review/2026-09-14-mission-control-pattern-
@@ -46,7 +47,7 @@ from datetime import date
 
 from sqlmodel import Session, select
 
-from models.assignment import Assignment
+from models.assignment import Assignment, confirmed_assignment_missions
 from models.availability_window import list_availability_windows
 from models.crew_skill import CrewSkill
 from models.enums import AssignmentStatus
@@ -111,17 +112,15 @@ def has_no_conflicting_confirmed_assignment(
     """No *confirmed* assignment (on any other mission) with an overlapping
     date range.
 
-    Assignments/confirmation don't exist yet (T6) — this is a real query
-    against the real ``assignments``/``missions`` tables (mirrors T4's
-    ``count_confirmed_assignments``), genuinely always ``True`` today because
-    the table is empty, not a hardcoded placeholder. It starts enforcing the
-    moment T6 creates confirmed assignments, with no change needed here.
+    T6 now creates confirmed assignments; ``confirmed_assignment_missions``
+    (``models/assignment.py``) is the query shared by this filter and T6's
+    own double-booking guard (FR-16), so neither carries its own copy.
     """
     assert crew.id is not None
-    other_windows = _confirmed_assignment_windows(session, crew.id, exclude_mission_id=mission.id)
+    other_missions = confirmed_assignment_missions(session, crew.id, exclude_mission_id=mission.id)
     return not any(
-        windows_overlap(mission.start_date, mission.end_date, other_start, other_end)
-        for other_start, other_end in other_windows
+        windows_overlap(mission.start_date, mission.end_date, other.start_date, other.end_date)
+        for other in other_missions
     )
 
 
@@ -135,24 +134,6 @@ HARD_FILTERS = (
 def is_eligible(session: Session, crew: User, mission: Mission, requirement: Requirement) -> bool:
     """Eligibility = every hard filter passes (FR-13a)."""
     return all(check(session, crew, mission, requirement) for check in HARD_FILTERS)
-
-
-def _confirmed_assignment_windows(
-    session: Session, crew_id: int, *, exclude_mission_id: int | None = None
-) -> list[tuple[date, date]]:
-    """Every mission's [start_date, end_date] this crew member holds a
-    *confirmed* assignment on, excluding ``exclude_mission_id`` (the mission
-    currently being matched -- a crew member's own confirmed assignment on
-    the requirement's own mission is not a "conflict")."""
-    statement = (
-        select(Mission.id, Mission.start_date, Mission.end_date)
-        .select_from(Assignment)
-        .join(Requirement, Requirement.id == Assignment.requirement_id)
-        .join(Mission, Mission.id == Requirement.mission_id)
-        .where(Assignment.crew_id == crew_id, Assignment.status == AssignmentStatus.CONFIRMED)
-    )
-    rows = session.exec(statement).all()
-    return [(start, end) for mission_id, start, end in rows if mission_id != exclude_mission_id]
 
 
 def _confirmed_assignment_count(session: Session, crew_id: int) -> int:
@@ -229,7 +210,10 @@ def _nearest_constraint_gap_days(session: Session, crew: User, mission: Mission)
     have no constraints at all."""
     assert crew.id is not None
     intervals = [(w.start_date, w.end_date) for w in list_availability_windows(session, crew.id)]
-    intervals += _confirmed_assignment_windows(session, crew.id, exclude_mission_id=mission.id)
+    intervals += [
+        (other.start_date, other.end_date)
+        for other in confirmed_assignment_missions(session, crew.id, exclude_mission_id=mission.id)
+    ]
     if not intervals:
         return None
     return min(_gap_days(mission, start, end) for start, end in intervals)

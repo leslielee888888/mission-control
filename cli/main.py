@@ -429,5 +429,51 @@ def match_run(
     _print_json(_handle_response(response))
 
 
+# --- assignments: propose, respond, double-booking guard (FR-14/FR-15/FR-16)
+
+
+assign_app = typer.Typer(help="Propose and respond to assignments (FR-14/FR-15/FR-16).")
+app.add_typer(assign_app, name="assign")
+
+
+@assign_app.command("propose")
+def assign_propose(mission_id: int, requirement_id: int, crew_id: int) -> None:
+    """Propose a crew member for a requirement (Mission Lead or Director);
+    up to the requirement's headcount."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/assignments",
+        json={"mission_id": mission_id, "requirement_id": requirement_id, "crew_id": crew_id},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@assign_app.command("respond")
+def assign_respond(assignment_id: int, action: str) -> None:
+    """Accept or decline a proposed assignment (`accept` or `decline`) —
+    the assignment's named crew member only."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/assignments/{assignment_id}/respond",
+        json={"action": action},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+assignment_app = typer.Typer(help="List assignments (FR-14/FR-15).")
+app.add_typer(assignment_app, name="assignment")
+
+
+@assignment_app.command("list")
+def assignment_list() -> None:
+    """List assignments: your own if you're a crew member, your whole org's
+    if you're a Mission Lead or Director."""
+    session_data = _require_session()
+    response = httpx.get(f"{_api_base_url()}/assignments", headers=_auth_headers(session_data))
+    _print_json(_handle_response(response))
+
+
 if __name__ == "__main__":
     app()
