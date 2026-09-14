@@ -31,7 +31,7 @@ from models.crew_profile import CrewProfile, get_crew_profile, get_or_create_cre
 from models.crew_skill import CrewSkill, list_crew_skills, upsert_crew_skill
 from models.enums import Role
 from models.skill import Skill, create_skill, get_skill_by_name, list_skills
-from models.user import User, get_user
+from models.user import User, get_user, list_crew_members
 from services.dates import windows_overlap
 
 
@@ -68,6 +68,14 @@ class CrewProfileView:
     skills: list[tuple[CrewSkill, Skill]]
 
 
+@dataclass(frozen=True)
+class CrewRosterEntry:
+    """One row of an org's crew roster listing (Director/Lead only)."""
+
+    user: User
+    skill_count: int
+
+
 def get_crew_member(session: Session, org_id: int, crew_user_id: int) -> User:
     """Resolve and validate a crew member id within an org.
 
@@ -91,6 +99,22 @@ def view_crew_profile(session: Session, org_id: int, crew_user_id: int) -> CrewP
     crew_skills = list_crew_skills(session, user.id)  # type: ignore[arg-type]
     skills = [(cs, _skill_or_raise(session, cs.skill_id)) for cs in crew_skills]
     return CrewProfileView(user=user, profile=profile, skills=skills)
+
+
+def list_org_crew_members(session: Session, org_id: int) -> list[CrewRosterEntry]:
+    """The org's full crew_member roster (Director/Lead only — FR visibility
+    rules, PRD §7 "Listing"). Reuses ``models.user.list_crew_members`` (the
+    matcher's own candidate pool, T5) rather than duplicating the
+    role-filtered query. Each entry's skill count reads ``crew_skills``
+    directly, since a crew member with no skills set yet may have no
+    ``crew_profiles`` row at all."""
+    members = list_crew_members(session, org_id)
+    entries = []
+    for member in members:
+        assert member.id is not None
+        skill_count = len(list_crew_skills(session, member.id))
+        entries.append(CrewRosterEntry(user=member, skill_count=skill_count))
+    return entries
 
 
 def _skill_or_raise(session: Session, skill_id: int) -> Skill:

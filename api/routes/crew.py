@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session
 
-from api.deps import get_current_user
+from api.deps import get_current_user, require_role
 from models.availability_window import AvailabilityWindow
 from models.database import get_session
 from models.enums import Role
@@ -27,11 +27,13 @@ from models.user import User
 from services.crew import (
     CrewMemberNotFoundError,
     CrewProfileView,
+    CrewRosterEntry,
     OverlappingWindowError,
     SkillNotFoundError,
     WindowNotFoundError,
     add_availability_window,
     list_crew_availability_windows,
+    list_org_crew_members,
     remove_availability_window,
     set_crew_skill_proficiency,
     update_crew_profile,
@@ -89,6 +91,13 @@ class AvailabilityWindowOut(BaseModel):
     end_date: date
 
 
+class CrewRosterEntryOut(BaseModel):
+    user_id: int
+    name: str
+    email: str
+    skill_count: int
+
+
 # --- helpers -----------------------------------------------------------
 
 
@@ -109,6 +118,15 @@ def _to_profile_out(view: CrewProfileView) -> CrewProfileOut:
 
 def _to_window_out(window: AvailabilityWindow) -> AvailabilityWindowOut:
     return AvailabilityWindowOut.model_validate(window, from_attributes=True)
+
+
+def _to_roster_entry_out(entry: CrewRosterEntry) -> CrewRosterEntryOut:
+    return CrewRosterEntryOut(
+        user_id=entry.user.id,  # type: ignore[arg-type]
+        name=entry.user.name,
+        email=entry.user.email,
+        skill_count=entry.skill_count,
+    )
 
 
 def _not_found() -> HTTPException:
@@ -143,6 +161,18 @@ def _require_skill_set_access(caller: User, target_user_id: int) -> None:
 def _require_self_crew(caller: User, target_user_id: int) -> None:
     if caller.id != target_user_id or caller.role != Role.CREW_MEMBER:
         raise _forbidden("Requires role: crew_member, managing your own availability")
+
+
+# --- roster listing (Director/Lead only, PRD §7 "Listing") -------------
+
+
+@router.get("", response_model=list[CrewRosterEntryOut])
+def list_crew_route(
+    session: Session = Depends(get_session),
+    caller: User = Depends(require_role(Role.DIRECTOR, Role.MISSION_LEAD)),
+) -> list[CrewRosterEntryOut]:
+    entries = list_org_crew_members(session, caller.org_id)
+    return [_to_roster_entry_out(entry) for entry in entries]
 
 
 # --- profile -----------------------------------------------------------

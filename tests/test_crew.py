@@ -119,6 +119,82 @@ def test_cross_org_profile_view_is_404_not_403(
     assert response.status_code == 404
 
 
+# --- roster listing (Director/Lead only, PRD §7 "Listing") -----------------
+
+
+def test_director_lists_the_org_crew_roster(
+    client: TestClient, seed_users: dict[str, SeededUser]
+) -> None:
+    director = seed_users["director_a"]
+    crew = seed_users["crew_a"]
+    token = _login(client, director)
+
+    response = client.get("/crew", headers=_auth(token))
+
+    assert response.status_code == 200
+    body = response.json()
+    assert any(entry["user_id"] == crew.id and entry["email"] == crew.email for entry in body)
+    # only crew_member-role users are on the roster (§10 #11) -- the
+    # Director themselves never appears in their own org's listing.
+    assert all(entry["user_id"] != director.id for entry in body)
+
+
+def test_lead_lists_the_org_crew_roster(
+    client: TestClient, seed_users: dict[str, SeededUser]
+) -> None:
+    lead = seed_users["lead_a"]
+    token = _login(client, lead)
+
+    response = client.get("/crew", headers=_auth(token))
+
+    assert response.status_code == 200
+
+
+def test_crew_member_cannot_list_the_org_roster(
+    client: TestClient, seed_users: dict[str, SeededUser]
+) -> None:
+    crew = seed_users["crew_a"]
+    token = _login(client, crew)
+
+    response = client.get("/crew", headers=_auth(token))
+
+    assert response.status_code == 403
+    assert "director" in response.json()["detail"].lower()
+
+
+def test_crew_roster_excludes_other_orgs_crew(
+    client: TestClient, seed_users: dict[str, SeededUser]
+) -> None:
+    director_b = seed_users["director_b"]
+    crew_a = seed_users["crew_a"]
+    token = _login(client, director_b)
+
+    response = client.get("/crew", headers=_auth(token))
+
+    assert response.status_code == 200
+    assert all(entry["user_id"] != crew_a.id for entry in response.json())
+
+
+def test_crew_roster_reflects_skill_count(
+    client: TestClient, seed_users: dict[str, SeededUser]
+) -> None:
+    director = seed_users["director_a"]
+    crew = seed_users["crew_a"]
+    token = _login(client, director)
+    client.post("/skills", json={"name": "Airlock Ops"}, headers=_auth(token))
+    client.put(
+        f"/crew/{crew.id}/skills",
+        json={"skill_name": "Airlock Ops", "proficiency": 3},
+        headers=_auth(token),
+    )
+
+    response = client.get("/crew", headers=_auth(token))
+
+    assert response.status_code == 200
+    entry = next(e for e in response.json() if e["user_id"] == crew.id)
+    assert entry["skill_count"] >= 1
+
+
 # --- skills: org taxonomy (FR-5) --------------------------------------------
 
 
