@@ -16,8 +16,10 @@ DEFAULT_DATABASE_URL = "sqlite:///./mission_control.db"
 
 
 def get_database_url() -> str:
-    """The SQLAlchemy database URL, overridable via env var (tests use this
-    to point at a real temporary SQLite file instead of the dev DB)."""
+    """The SQLAlchemy database URL, overridable via env var. Tests do not use
+    this — they build an isolated temporary-file engine directly via
+    ``make_engine()`` (see ``tests/conftest.py``) so a developer's
+    ``MISSION_CONTROL_DATABASE_URL`` can never leak into the test suite."""
     return os.environ.get("MISSION_CONTROL_DATABASE_URL", DEFAULT_DATABASE_URL)
 
 
@@ -41,7 +43,18 @@ def create_db_and_tables(bound_engine: Engine | None = None) -> None:
     SQLModel.metadata.create_all(bound_engine or engine)
 
 
+def session_dependency_for(bound_engine: Engine) -> Generator[Session, None, None]:
+    """Yield one synchronous ``Session`` bound to ``bound_engine``.
+
+    Shared by ``get_session`` (bound to the module-level dev/prod engine) and
+    ``tests/conftest.py`` (bound to a temporary test engine), so session
+    semantics — commit/rollback handling, ``expire_on_commit`` — live in
+    exactly one place instead of being hand-duplicated per call site.
+    """
+    with Session(bound_engine) as session:
+        yield session
+
+
 def get_session() -> Generator[Session, None, None]:
     """FastAPI dependency yielding one synchronous session per request."""
-    with Session(engine) as session:
-        yield session
+    yield from session_dependency_for(engine)

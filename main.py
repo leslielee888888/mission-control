@@ -9,7 +9,6 @@ from fastapi import FastAPI
 
 from api.errors import register_exception_handlers
 from api.routes.health import router as health_router
-from models.database import create_db_and_tables
 
 
 def create_app() -> FastAPI:
@@ -18,10 +17,14 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
     app.include_router(health_router)
 
-    # Scaffold only (T1): create tables on startup against the dev SQLite
-    # file so the app is runnable out of the box. T9 replaces ad-hoc startup
-    # table creation with the documented seed command.
-    create_db_and_tables()
+    # No table creation here, deliberately: creating tables is the seed
+    # script's job (`scripts/seed.py`), not a side effect of importing or
+    # constructing the app. An eager `create_db_and_tables()` call here
+    # used to run against the real dev-database engine on every import —
+    # including every test run, since `tests/conftest.py` imports `app` —
+    # which wrote a real mission_control.db file regardless of the
+    # dependency override tests set up for `get_session`. Run
+    # `python scripts/seed.py` before starting the server locally.
 
     return app
 

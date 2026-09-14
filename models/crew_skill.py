@@ -15,4 +15,4 @@ class CrewSkill(SQLModel, table=True):
 
     crew_id: int = Field(foreign_key="crew_profiles.user_id", primary_key=True)
     skill_id: int = Field(foreign_key="skills.id", primary_key=True)
-    proficiency: int
+    proficiency: int = Field(ge=1, le=5)

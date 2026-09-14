@@ -1,7 +1,14 @@
-# Mission Control API — runtime + dev dependencies.
+# Mission Control API - runtime + dev dependencies.
 #
-# Plain pip, no poetry/uv (per PRD §8). Install with:
+# Plain pip, no poetry/uv (per PRD section 8). Install with:
 #   pip install -r requirements.txt
+#
+# Comments in this file are kept plain-ASCII deliberately: a non-ASCII
+# character here (an em-dash, a curly quote) can crash `pip install` on
+# Windows machines whose default locale isn't UTF-8 (pip's requirements-file
+# parser falls back to the platform's preferred encoding when no BOM or
+# encoding declaration is present) - this bit a real Windows dev machine
+# during T1's review.
 
 # --- API ---
 fastapi>=0.115,<1.0

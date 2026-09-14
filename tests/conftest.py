@@ -18,7 +18,7 @@ from sqlalchemy import Engine
 from sqlmodel import Session
 
 import models  # noqa: F401  (imported for its side effect: registers all entities)
-from models.database import create_db_and_tables, get_session, make_engine
+from models.database import create_db_and_tables, get_session, make_engine, session_dependency_for
 
 
 @pytest.fixture(scope="session")
@@ -46,8 +46,7 @@ def client(engine: Engine) -> Generator[TestClient, None, None]:
     from main import app
 
     def get_test_session() -> Generator[Session, None, None]:
-        with Session(engine) as db_session:
-            yield db_session
+        yield from session_dependency_for(engine)
 
     app.dependency_overrides[get_session] = get_test_session
     with TestClient(app) as test_client:
