@@ -412,6 +412,101 @@ requirement proves too large for the timebox, the brief's own guidance governs: 
 breadth, keep a coherent, verified vertical slice, and say so plainly in this document
 rather than silently shipping less than what's written above.
 
+## 12. Tasks
+
+**Progress:** 10 tasks · 0 done (0%)
+
+Milestone: [Mission Control](https://github.com/leslielee888888/mission-control/milestone/1) ·
+Project: [Mission Control](https://github.com/leslielee888888/mission-control/projects) (owner: leslielee888888)
+
+| ID | Task | Reqs | Owner | Depends on | Issue | Status |
+|----|------|------|-------|------------|-------|--------|
+| T1 | Scaffold — project layout, DB models, seed skeleton, error handling | FR-20 | `python-programmer` | — | [#1](https://github.com/leslielee888888/mission-control/issues/1) | todo |
+| T2 | Auth + RBAC + tenant scoping | FR-1, FR-2, FR-3 | `python-programmer` | T1 | [#2](https://github.com/leslielee888888/mission-control/issues/2) | todo |
+| T3 | Crew management — profile, skills, availability | FR-4, FR-5, FR-6, FR-7 | `python-programmer` | T2 | [#3](https://github.com/leslielee888888/mission-control/issues/3) | todo |
+| T4 | Mission lifecycle + approval gate | FR-8, FR-9, FR-10, FR-11, FR-12, FR-17 | `python-programmer` | T2 | [#4](https://github.com/leslielee888888/mission-control/issues/4) | todo |
+| T5 | Matching engine — retrieval + ranking | FR-13 | `python-programmer` | T3, T4 | [#5](https://github.com/leslielee888888/mission-control/issues/5) | todo |
+| T6 | Assignments — propose, respond, double-booking guard | FR-14, FR-15, FR-16 | `python-programmer` | T5 | [#6](https://github.com/leslielee888888/mission-control/issues/6) | todo |
+| T7 | CLI (`missionctl`) — full workflow coverage | FR-18 | `python-programmer` | T2, T3, T4, T5, T6 | [#7](https://github.com/leslielee888888/mission-control/issues/7) | todo |
+| T8 | Web UI showcase SPA | FR-21 | `fe-programmer` | T2, T4, T5, T6 | [#8](https://github.com/leslielee888888/mission-control/issues/8) | todo |
+| T9 | Seed data, README, end-to-end verification | FR-19 | `python-programmer` | T7 | [#9](https://github.com/leslielee888888/mission-control/issues/9) | todo |
+| T10 | Transcript packaging | — | Leslie | T9 | [#10](https://github.com/leslielee888888/mission-control/issues/10) | todo |
+
+### T1 — Scaffold
+
+- [ ] Layout follows `routes → services → models` (§6 NFR)
+- [ ] DB models exist for all 10 tables in the data model
+- [ ] Invalid input → 422 with field-level messages (FR-20)
+- [ ] Unhandled error → generic 500, full detail logged server-side, never leaked (FR-20)
+- [ ] Seed script skeleton (fleshed out in T9)
+
+### T2 — Auth + RBAC + tenant scoping
+
+- [ ] Every record carries `org_id` from the authenticated caller, never client input (FR-1)
+- [ ] Cross-org record access → 404, not 403 (FR-1)
+- [ ] Real `POST /auth/login` (email + password) issues a bearer token; `missionctl login` too (FR-2, §10 #24)
+- [ ] Missing/invalid token or wrong credentials → 401 (FR-2)
+- [ ] Disallowed role → 403 naming the required role, no side effect (FR-3)
+- [ ] Test: org A cannot read/write org B's data even with a valid token
+
+### T3 — Crew management
+
+- [ ] Crew edits own profile; Director/Lead view-only on others (FR-4)
+- [ ] Director creates org-scoped, name-unique skills (FR-5)
+- [ ] Proficiency 1–5 set per crew/skill, visible to Leads/Directors (FR-6)
+- [ ] Non-overlapping availability windows, default-available (FR-7)
+- [ ] `availability remove <id>` — delete-only (FR-7, §10 #2)
+
+### T4 — Mission lifecycle + approval gate
+
+- [ ] Mission create (draft) + requirements (FR-8)
+- [ ] 6-state machine; invalid transition → 409, unchanged (FR-9) — one table-driven executor, not six handlers
+- [ ] `submit` requires ≥1 requirement (FR-10)
+- [ ] Non-creator Director approves; creator → 403; reject requires reason, returns to draft (FR-11)
+- [ ] `activate`/`complete` explicit actions (FR-12)
+- [ ] Fulfillment visible; under-staffing never blocks activation (FR-17)
+
+### T5 — Matching engine
+
+- [ ] Retrieval: 3 independent hard-filter predicates, not one compound condition (FR-13a)
+- [ ] Ranking: 50/30/20 weighted, normalized 0–1, independent Strategy functions (FR-13b, §10 #9)
+- [ ] Every eligible candidate returned, no cap, each with score + breakdown (FR-13c)
+- [ ] Date-overlap helper shared with T6, not duplicated
+- [ ] Representative test cases (§10 #17)
+
+### T6 — Assignments
+
+- [ ] Propose up to headcount; over-headcount rejected (FR-14)
+- [ ] Accept → confirmed; decline → declined, headcount reopened (FR-15)
+- [ ] Confirming over a conflicting confirmed assignment → 409 naming the conflict (FR-16)
+
+### T7 — CLI
+
+- [ ] Every §7 workflow via `missionctl` over HTTP, no direct DB reads (FR-18)
+- [ ] JSON output, pretty-printed (§10 #15)
+- [ ] System of record for CLI coverage — SPA is additional (§10 #19)
+
+### T8 — Web UI showcase SPA
+
+- [ ] Login (email+password → token in `localStorage`) (FR-21, §10 #24)
+- [ ] Mission list → detail (requirements, fulfillment, matcher run) (FR-21)
+- [ ] Propose/approve/reject with optimistic updates + loading/error states (FR-21, §10 #18)
+- [ ] My Assignments (accept/decline), role-conditional (FR-21, §10 #23)
+- [ ] React Query, `useState`, Tailwind, generated typed client (§10 #20/#21/#25)
+- [ ] 2–3 screens, mocked data OK outside the vertical slice (§10 #16–#18)
+
+### T9 — Seed data, README, end-to-end verification
+
+- [ ] ≥2 orgs, Director + ≥2 Leads + ≥6 crew each, org skill taxonomy, missions in ≥3 states (FR-19)
+- [ ] Demo passwords generated and documented (§10 #24)
+- [ ] README: clean-checkout setup steps
+- [ ] Manual run-through of every §7 workflow
+
+### T10 — Transcript packaging
+
+- [ ] Every session (main + every subagent, incl. T8's `fe-programmer`) exported unedited to `transcripts/` (§8)
+- [ ] Refresh/add pairs covering everything after the Discovery grilling session
+
 ## 13. Refinement log
 
 Appended during the Refinement stage. Empty until then.
