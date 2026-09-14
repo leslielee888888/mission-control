@@ -9,3 +9,7 @@ venv/
 *.egg-info/
 .env
 seed_credentials.txt
+
+# Leftover git worktree directories from subagent task dispatch (this
+# session's own tooling, not part of the project) - never part of the repo.
+.claude/worktrees/
