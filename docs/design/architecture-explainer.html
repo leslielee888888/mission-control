@@ -648,7 +648,32 @@
     </div>
 
     <div class="decision">
-      <div class="label">Strategy <span style="font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; font-size: 11px;">(one narrow use)</span></div>
+      <div class="label">The matcher's actual shape</div>
+      <div class="body">
+        <p>Before naming the two patterns below individually: together they're a <strong>two-stage retrieval-and-ranking pipeline</strong> — the same architecture behind search engines, ad-matching, and every real recommender system. Cheaply narrow a large pool to a feasible candidate set (<em>retrieval</em>), then run a more expensive scoring function only over survivors (<em>ranking</em>). Mission Control's matcher is exactly this shape, which matters because it's the one piece of this build explicitly singled out for its "sophistication" — recognizing the problem's actual lineage is the point, not just filtering a list and sorting it.</p>
+        <div class="flow" style="margin-top: 14px;">
+          <div class="step"><span class="who">Retrieval</span>Org's crew pool<br><span style="font-weight:400; color: var(--text-3);">e.g. 8</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">filter</span>Skill @ min proficiency<br><span style="font-weight:400; color: var(--text-3);">5 left</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">filter</span>Available for window<br><span style="font-weight:400; color: var(--text-3);">4 left</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">filter</span>No conflicting confirmed<br><span style="font-weight:400; color: var(--text-3);">3 eligible</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">Ranking</span>Weighted score 50/30/20<br><span style="font-weight:400; color: var(--text-3);">all 3 returned, ranked</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Pipe and Filter <span style="font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; font-size: 11px;">(retrieval stage)</span></div>
+      <div class="body">
+        <p>FR-13(a)'s three hard constraints — skill at proficiency, available for the window, no conflicting <em>confirmed</em> assignment — are three independent predicates over one candidate, not one big compound condition. Each is its own small function (<code>has_skill_at_proficiency</code>, <code>is_available_for_window</code>, <code>has_no_conflicting_confirmed_assignment</code>), and eligibility is just <code>all(check(crew) for check in HARD_FILTERS)</code>. That makes each constraint unit-testable with a minimal one-crew fixture instead of needing a full scenario to exercise all three at once — and the date-overlap helper underneath the second and third checks is the same function FR-16's double-booking guard reuses, not a second copy of the same logic.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Strategy <span style="font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; font-size: 11px;">(ranking stage — one narrow use)</span></div>
       <div class="body">
         <p>The matcher's scoring, and only that. Each of the three factors — proficiency surplus, workload, availability margin — is its own small pure function; the ranker calls all three and combines them at the fixed weights. That's what makes "a one-line breakdown of which factors contributed" (FR-13c) fall out naturally, since each factor is already computed separately — and each one unit-tests in isolation.</p>
       </div>
