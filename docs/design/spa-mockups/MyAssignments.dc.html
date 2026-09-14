@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    :root {
+      --bg: oklch(98% 0.004 250);
+      --surface: oklch(100% 0 0);
+      --surface-2: oklch(96% 0.005 250);
+      --border: oklch(90% 0.006 250);
+      --text: oklch(22% 0.02 250);
+      --text-2: oklch(48% 0.015 250);
+      --text-3: oklch(64% 0.01 250);
+      --accent: oklch(55% 0.16 230);
+      --accent-dark: oklch(46% 0.16 230);
+      --accent-2: oklch(94% 0.03 230);
+
+      --pending: oklch(58% 0.15 75);      --pending-bg: oklch(95% 0.035 75);
+      --approved: oklch(55% 0.12 165);    --approved-bg: oklch(94% 0.03 165);
+      --declined: oklch(55% 0.17 25);     --declined-bg: oklch(95% 0.03 25);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif; color: var(--text); background: var(--bg); }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-dark); }
+    button { font-family: inherit; cursor: pointer; border-radius: 6px; font-weight: 600; font-size: 13px; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 100px; font-size: 12px; font-weight: 600; }
+    .navitem { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 7px; font-size: 13.5px; font-weight: 500; color: var(--text-2); }
+    .mono { font-family: "IBM Plex Mono", monospace; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 880px; display: flex;">
+
+  <!-- Sidebar (Crew Member — narrower nav, no Missions/Crew visibility) -->
+  <div style="width: 240px; flex: none; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 22px 16px;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 20px 8px;">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.75">
+        <circle cx="12" cy="12" r="9"></circle>
+        <circle cx="12" cy="12" r="2.5" fill="var(--accent)" stroke="none"></circle>
+        <path d="M12 3 a9 4 0 0 1 0 18 a9 4 0 0 1 0 -18" transform="rotate(35 12 12)"></path>
+      </svg>
+      <div style="font-size: 14.5px; font-weight: 700;">Mission Control</div>
+    </div>
+    <div style="padding: 0 8px 18px 8px; font-size: 11.5px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em;">Aurora Deep Space Co.</div>
+
+    <div style="display: flex; flex-direction: column; gap: 2px;">
+      <div class="navitem" style="background: var(--accent-2); color: var(--accent-dark);">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 12l2 2 4-4"></path><circle cx="12" cy="12" r="9"></circle></svg>
+        My assignments
+      </div>
+      <div class="navitem">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.5 20c1.2-4.3 3.6-6.4 6.5-6.4s5.3 2.1 6.5 6.4"></path></svg>
+        My profile
+      </div>
+    </div>
+    <div style="font-size: 11px; color: var(--text-3); padding: 14px 12px 0 12px; line-height: 1.5;">You only see missions you've been proposed or confirmed on — not the org's full mission list.</div>
+
+    <div style="flex: 1;"></div>
+
+    <div style="display: flex; align-items: center; gap: 10px; padding: 10px 8px; border-top: 1px solid var(--border);">
+      <div style="width: 30px; height: 30px; border-radius: 100px; background: var(--accent-2); color: var(--accent-dark); font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center;">TC</div>
+      <div style="flex: 1;">
+        <div style="font-size: 13px; font-weight: 600;">Tomas Csillag</div>
+        <div style="font-size: 11px; color: var(--text-3);">Crew Member</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div style="flex: 1; padding: 32px 40px; display: flex; flex-direction: column; gap: 22px;">
+
+    <div>
+      <div style="font-size: 22px; font-weight: 700;">My Assignments</div>
+      <div style="font-size: 13px; color: var(--text-2); margin-top: 2px;">Missions you've been proposed or confirmed for.</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 12px;">
+
+      <!-- proposed, needs response -->
+      <div style="background: var(--surface); border: 1px solid var(--pending); border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 20px;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 15px; font-weight: 700;">Deep Ice Core Retrieval</div>
+            <span class="badge" style="background: var(--pending-bg); color: var(--pending);">Proposed</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-2); margin-top: 4px;">Mar 4 – Mar 16 · matched on EVA Certification (level 4)</div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button style="background: var(--accent); color: white; padding: 9px 18px;">Accept</button>
+          <button style="background: var(--surface); color: var(--text-2); border: 1px solid var(--border); padding: 9px 18px;">Decline</button>
+        </div>
+      </div>
+
+      <!-- proposed, in-flight (loading) -->
+      <div style="background: var(--surface); border: 1px solid var(--pending); border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 20px; opacity: 0.75;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 15px; font-weight: 700;">Lunar Antenna Calibration</div>
+            <span class="badge" style="background: var(--pending-bg); color: var(--pending);">Proposed</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-2); margin-top: 4px;">Mar 25 – Mar 27 · matched on Antenna Systems (level 3)</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text-2);">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-2)" stroke-width="2.5"><path d="M21 12a9 9 0 1 1-3-6.7"></path></svg>
+          Accepting…
+        </div>
+      </div>
+
+      <!-- confirmed -->
+      <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 20px;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 15px; font-weight: 700;">Comms Relay Repair</div>
+            <span class="badge" style="background: var(--approved-bg); color: var(--approved);">Confirmed</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-2); margin-top: 4px;">Feb 22 – Mar 1 · matched on EVA Certification (level 4)</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px; color: var(--approved); font-size: 13px; font-weight: 600;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="var(--approved)" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.3 2.3L16 10"></path></svg>
+          You're on this mission
+        </div>
+      </div>
+
+      <!-- declined, historical, muted -->
+      <div style="background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 18px 22px; display: flex; align-items: center; gap: 20px; opacity: 0.65;">
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="font-size: 15px; font-weight: 700;">Solar Array Redeploy</div>
+            <span class="badge" style="background: var(--declined-bg); color: var(--declined);">Declined</span>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-2); margin-top: 4px;">Jan 12 – Jan 15 · matched on EVA Certification (level 4)</div>
+        </div>
+        <div style="font-size: 12px; color: var(--text-3);">Declined Jan 6 — your response reopened this slot for the mission lead.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

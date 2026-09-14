@@ -18,6 +18,9 @@
   web interface is not required," and the CLI remains the system of record for that
   coverage. A deliberately minimal React SPA (FR-21, §7) is also included — not
   required, added as a state-management showcase — see §10 #16/#18 for its scope.
+  Mockups: [Mission Control SPA Mockups](https://claude.ai/code/artifact/de0b0bf5-d39d-4a2b-8392-1ac4339bd93a)
+  (4 screens: login, mission list, mission detail w/ matcher + approval, my
+  assignments — source in `docs/design/spa-mockups/`).
 
 ## 0. What this actually is
 
@@ -277,7 +280,9 @@ a clear message (never a raw traceback):
 
 **Web UI (`web/`, showcase only — FR-21):** a minimal React SPA hitting the same API.
 Login reuses FR-2 (email + password → bearer token in `localStorage`). Screens are
-role-conditional on the logged-in user (§10 #23), not a full app:
+role-conditional on the logged-in user (§10 #23), not a full app. Mockups:
+[Mission Control SPA Mockups](https://claude.ai/code/artifact/de0b0bf5-d39d-4a2b-8392-1ac4339bd93a)
+(source: `docs/design/spa-mockups/`):
 
 - **Mission list → mission detail** (Mission Lead / Director) — requirements,
   fulfillment, a matcher run with ranked candidates and score breakdowns, and
