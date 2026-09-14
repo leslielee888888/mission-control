@@ -608,6 +608,62 @@
   </section>
 
   <section>
+    <h2>Design patterns — the few that earn their place</h2>
+    <p>A small, deliberate set. Most classic patterns would be overkill for this size of system, and reaching for them anyway would cut against the brief's own "coherent design over breadth" — so each one below is named for a specific problem it solves here, not for its own sake.</p>
+
+    <div class="decision">
+      <div class="label">Singleton</div>
+      <div class="body">
+        <p>Exactly one legitimate use, and it's not hand-rolled: the SQLAlchemy <code>engine</code> (connection pool) is created once at app startup and reused for the process's lifetime — FastAPI/SQLAlchemy give you this for free as a module-level object, no <code>getInstance()</code> to write.</p>
+        <p>Nowhere else. Specifically <strong>not</strong> the matcher, not a "mission service," not anything holding state across requests — this is multi-tenant, and a stateful singleton service is exactly how org A's data leaks into org B's request. Services are stateless: plain functions taking <code>org_id</code> and a DB session as arguments.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Dependency injection</div>
+      <div class="body">
+        <p>The pattern actually doing the work, via FastAPI's <code>Depends()</code>: the DB session (one per request, closed after), <code>get_current_user</code> (decodes the bearer token), and a role guard — <code>Depends(require_role(Role.DIRECTOR))</code> — that the route declares and FastAPI enforces before the handler body runs. It's what makes FR-3's "endpoint declares its allowed role(s)" a one-line decorator instead of a copy-pasted <code>if</code> in every handler.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Repository</div>
+      <div class="body">
+        <p>One module of query functions per entity, each taking <code>org_id</code> explicitly — <code>mission_repo.get(db, org_id, mission_id)</code>. Plain functions grouped by file, not a generic <code>IRepository&lt;T&gt;</code> interface hierarchy: that abstraction buys nothing with exactly one implementation (SQLite) and no second one planned.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Service layer</div>
+      <div class="body">
+        <p>Domain logic — lifecycle transitions, the matcher, assignment rules — lives in <code>services/</code>, importable and testable without HTTP in the loop. This is the pattern the whole <code>routes → services → models</code> layering already commits to; the other patterns here are really just how that middle layer is built.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Table-driven state machine</div>
+      <div class="body">
+        <p>FR-9's six states and seven transitions become one literal data structure — <code>ALLOWED_TRANSITIONS: dict[Status, set[Status]]</code> — checked in exactly one place. Not a chain of <code>if status == "draft" and action == "submit"</code> scattered across handlers, which is how a transition nobody remembered to guard gets through.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Strategy <span style="font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; font-size: 11px;">(one narrow use)</span></div>
+      <div class="body">
+        <p>The matcher's scoring, and only that. Each of the three factors — proficiency surplus, workload, availability margin — is its own small pure function; the ranker calls all three and combines them at the fixed weights. That's what makes "a one-line breakdown of which factors contributed" (FR-13c) fall out naturally, since each factor is already computed separately — and each one unit-tests in isolation.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Deliberately skipped</div>
+      <div class="body">
+        <p>Each would be defensible in a bigger system; here they'd be surface area nobody asked for — a repository <em>interface</em> plus a DI container (no second datastore is coming), CQRS or event sourcing (nothing here needs a read/write split), a pluggable matcher-strategy registry (there's one matcher, not a family of interchangeable ones).</p>
+      </div>
+    </div>
+
+  </section>
+
+  <section>
     <h2>The primary flow end to end</h2>
     <div class="flow">
       <div class="step"><span class="who">Lead</span>Create mission + requirements</div>
