@@ -11,6 +11,7 @@ from api.errors import register_exception_handlers
 from api.routes.auth import router as auth_router
 from api.routes.crew import router as crew_router
 from api.routes.health import router as health_router
+from api.routes.mission import router as mission_router
 from api.routes.skills import router as skills_router
 from api.routes.users import router as users_router
 
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(users_router)
     app.include_router(skills_router)
     app.include_router(crew_router)
+    app.include_router(mission_router)
 
     # No table creation here, deliberately: creating tables is the seed
     # script's job (`scripts/seed.py`), not a side effect of importing or
