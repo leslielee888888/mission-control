@@ -1,0 +1,355 @@
+<title>Mission Control Architecture</title>
+<style>
+  :root {
+    --bg: oklch(98% 0.004 250);
+    --surface: oklch(100% 0 0);
+    --surface-2: oklch(96% 0.006 250);
+    --border: oklch(89% 0.008 250);
+    --text: oklch(20% 0.02 250);
+    --text-2: oklch(46% 0.015 250);
+    --text-3: oklch(60% 0.012 250);
+    --accent-be: oklch(55% 0.16 230);
+    --accent-be-bg: oklch(94% 0.03 230);
+    --accent-fe: oklch(52% 0.12 190);
+    --accent-fe-bg: oklch(93% 0.028 190);
+    --accent-cli: oklch(38% 0.015 250);
+    --accent-cli-bg: oklch(93% 0.006 250);
+    --ok: oklch(55% 0.13 165);
+    --ok-bg: oklch(93% 0.03 165);
+    --warn: oklch(60% 0.15 80);
+    --warn-bg: oklch(94% 0.04 80);
+    --shadow: 0 1px 2px oklch(0% 0 0 / 0.05), 0 8px 24px oklch(0% 0 0 / 0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: oklch(17% 0.012 250);
+      --surface: oklch(21% 0.014 250);
+      --surface-2: oklch(25% 0.015 250);
+      --border: oklch(32% 0.016 250);
+      --text: oklch(93% 0.006 250);
+      --text-2: oklch(74% 0.012 250);
+      --text-3: oklch(58% 0.012 250);
+      --accent-be: oklch(72% 0.13 230);
+      --accent-be-bg: oklch(28% 0.05 230);
+      --accent-fe: oklch(74% 0.1 190);
+      --accent-fe-bg: oklch(27% 0.045 190);
+      --accent-cli: oklch(86% 0.008 250);
+      --accent-cli-bg: oklch(28% 0.01 250);
+      --ok: oklch(72% 0.12 165);
+      --ok-bg: oklch(27% 0.045 165);
+      --warn: oklch(78% 0.13 80);
+      --warn-bg: oklch(30% 0.05 80);
+      --shadow: 0 1px 2px oklch(0% 0 0 / 0.3), 0 8px 24px oklch(0% 0 0 / 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: oklch(17% 0.012 250);
+    --surface: oklch(21% 0.014 250);
+    --surface-2: oklch(25% 0.015 250);
+    --border: oklch(32% 0.016 250);
+    --text: oklch(93% 0.006 250);
+    --text-2: oklch(74% 0.012 250);
+    --text-3: oklch(58% 0.012 250);
+    --accent-be: oklch(72% 0.13 230);
+    --accent-be-bg: oklch(28% 0.05 230);
+    --accent-fe: oklch(74% 0.1 190);
+    --accent-fe-bg: oklch(27% 0.045 190);
+    --accent-cli: oklch(86% 0.008 250);
+    --accent-cli-bg: oklch(28% 0.01 250);
+    --ok: oklch(72% 0.12 165);
+    --ok-bg: oklch(27% 0.045 165);
+    --warn: oklch(78% 0.13 80);
+    --warn-bg: oklch(30% 0.05 80);
+    --shadow: 0 1px 2px oklch(0% 0 0 / 0.3), 0 8px 24px oklch(0% 0 0 / 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    padding: 0 20px;
+  }
+  a { color: var(--accent-be); }
+  a:hover { color: var(--accent-fe); }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  h1, h2, h3 { text-wrap: balance; }
+  .wrap { max-width: 860px; margin: 0 auto; padding-block: 56px 80px; }
+  .wide { max-width: 980px; }
+  p { line-height: 1.65; color: var(--text-2); }
+  p, li { max-width: 68ch; }
+  .lede { font-size: 17px; color: var(--text); }
+
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-be);
+  }
+  h1 { font-size: clamp(28px, 4vw, 38px); margin: 10px 0 6px 0; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 0 0 14px 0; font-weight: 700; }
+  h3 { font-size: 15px; margin: 0 0 8px 0; font-weight: 700; }
+
+  .meta { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+  .meta a { color: var(--text-3); text-decoration: underline; }
+
+  section { margin-top: 52px; }
+  section:first-of-type { margin-top: 36px; }
+
+  .stackrow {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    max-width: 980px; margin: 0 auto;
+  }
+  @media (max-width: 760px) { .stackrow { grid-template-columns: 1fr; } }
+  .stackcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .stackcard .tag {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: 100px;
+    margin-bottom: 12px;
+  }
+  .tag.be { background: var(--accent-be-bg); color: var(--accent-be); }
+  .tag.fe { background: var(--accent-fe-bg); color: var(--accent-fe); }
+  .tag.cli { background: var(--accent-cli-bg); color: var(--accent-cli); }
+  .stackcard ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .stackcard li { display: flex; flex-direction: column; gap: 2px; }
+  .stackcard .lib { font-weight: 600; font-size: 14px; color: var(--text); }
+  .stackcard .why { font-size: 12.5px; color: var(--text-3); line-height: 1.5; }
+
+  figure { margin: 0; }
+  figcaption { font-size: 12.5px; color: var(--text-3); text-align: center; margin-top: 14px; max-width: 60ch; margin-inline: auto; }
+  .diagram-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 20px 20px 20px; box-shadow: var(--shadow); }
+  svg.arch { width: 100%; height: auto; display: block; }
+
+  .legend { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; margin-top: 16px; font-size: 12px; color: var(--text-2); }
+  .legend .key { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .swatch { width: 20px; height: 10px; border-radius: 3px; flex: none; }
+
+  .decision {
+    display: grid; grid-template-columns: 160px 1fr; gap: 18px 24px; align-items: start;
+    padding: 18px 0; border-top: 1px solid var(--border);
+  }
+  .decision:first-of-type { border-top: none; }
+  @media (max-width: 640px) { .decision { grid-template-columns: 1fr; gap: 6px; } }
+  .decision .label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); padding-top: 3px; }
+  .decision .body p { margin: 0 0 8px 0; }
+  .decision .body p:last-child { margin-bottom: 0; }
+  .decision .body code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 0.92em; }
+
+  .flow {
+    display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center;
+    margin: 0 auto; max-width: 980px;
+  }
+  .flow .step {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: 12.5px; font-weight: 600; text-align: center; box-shadow: var(--shadow);
+    min-width: 108px;
+  }
+  .flow .step .who { display: block; font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .flow .arrow { color: var(--text-3); padding: 0 6px; font-size: 15px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); font-weight: 600; }
+  td.mono { color: var(--text-2); }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  .table-wrap table { margin: 0; }
+  .table-wrap th, .table-wrap td { padding: 12px 16px; }
+
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-3); }
+  footer a { color: var(--text-3); }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div class="wrap">
+
+  <div class="eyebrow">Explainer artifact · companion to the PRD</div>
+  <h1>Mission Control — architecture &amp; stack</h1>
+  <div class="meta">How the pieces fit together and why each library was chosen. Full requirements live in <code>docs/prd/mission-control.md</code>; this page is the fast read.</div>
+
+  <section>
+    <p class="lede">Mission Control is one API with three clients. A CLI and a minimal web UI both talk to the same FastAPI service over HTTP — neither reads the database directly, and neither gets its own copy of business logic. The API is layered (routes → services → models) so the rules that matter — tenant isolation, the approval gate, the matcher — live in exactly one place.</p>
+  </section>
+
+  <section>
+    <h2>Stack, and why</h2>
+    <div class="stackrow">
+
+      <div class="stackcard">
+        <div class="tag be">Backend</div>
+        <ul>
+          <li><span class="lib">FastAPI</span><span class="why">Type-hinted routes, automatic OpenAPI — the schema the SPA's typed client is generated from.</span></li>
+          <li><span class="lib">SQLModel</span><span class="why">SQLAlchemy + Pydantic in one model — one class defines the table and the validation.</span></li>
+          <li><span class="lib">SQLite</span><span class="why">Genuinely relational domain (orgs, crew, missions, requirements, assignments with real foreign keys) — no external service to install for a take-home.</span></li>
+          <li><span class="lib">pytest</span><span class="why">Representative cases over the vertical slice, not exhaustive suites — see the coverage boundary below.</span></li>
+          <li><span class="lib">bcrypt</span><span class="why">Password hashing for the real login endpoint — see the auth note below.</span></li>
+        </ul>
+      </div>
+
+      <div class="stackcard">
+        <div class="tag fe">Frontend (showcase)</div>
+        <ul>
+          <li><span class="lib">React + Vite</span><span class="why">Fast dev loop for a handful of screens — no framework machinery this build doesn't need.</span></li>
+          <li><span class="lib">React Query</span><span class="why">Server state — loading/error/stale states and cache invalidation on mutation, which is the whole point of the showcase.</span></li>
+          <li><span class="lib">Generated typed client</span><span class="why">From FastAPI's OpenAPI schema — calls read as <code>api.mission.approve(id)</code>, RPC-flavored, no second protocol.</span></li>
+          <li><span class="lib">useState</span><span class="why">Local UI state only — no Redux/Zustand for three screens.</span></li>
+        </ul>
+      </div>
+
+      <div class="stackcard">
+        <div class="tag cli">CLI</div>
+        <ul>
+          <li><span class="lib">Typer</span><span class="why">Pairs naturally with FastAPI's type hints and Pydantic schemas — same mental model, both ends.</span></li>
+          <li><span class="lib">httpx</span><span class="why">The CLI's HTTP client — every command is a real request, never a DB shortcut.</span></li>
+          <li><span class="lib">missionctl</span><span class="why">System of record for full workflow coverage; JSON output, pretty-printed.</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="wide">
+    <h2>How a request moves through the system</h2>
+    <div class="diagram-wrap">
+      <svg class="arch" viewBox="0 0 900 610" role="img" aria-label="Two clients, the CLI and the web UI, both send authenticated HTTP requests to one FastAPI layer. It calls into a services layer, passing org_id explicitly. The services layer holds the real, tested vertical slice — auth and RBAC, mission lifecycle and approval, the matcher, and assignments — drawn solid, plus crew CRUD, drawn dashed as lighter-effort scaffolding. Services query the SQLite database through org-scoped queries.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- Clients -->
+        <rect x="70" y="28" width="230" height="58" rx="10" fill="var(--accent-cli-bg)" stroke="var(--accent-cli)" stroke-width="1.5"></rect>
+        <text x="185" y="52" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--accent-cli)">CLI</text>
+        <text x="185" y="70" text-anchor="middle" font-size="11" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">missionctl</text>
+
+        <rect x="600" y="28" width="230" height="58" rx="10" fill="var(--accent-fe-bg)" stroke="var(--accent-fe)" stroke-width="1.5"></rect>
+        <text x="715" y="52" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--accent-fe)">Web UI</text>
+        <text x="715" y="70" text-anchor="middle" font-size="11" fill="var(--text-3)">React SPA · showcase only</text>
+
+        <!-- arrows clients -> API -->
+        <line x1="200" y1="86" x2="330" y2="148" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <line x1="710" y1="86" x2="580" y2="148" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="450" y="118" text-anchor="middle" font-size="11.5" fill="var(--text-3)">HTTPS + bearer token (same login endpoint, both clients)</text>
+
+        <!-- API -->
+        <rect x="200" y="150" width="500" height="60" rx="10" fill="var(--accent-be-bg)" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="450" y="176" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--accent-be)">API — FastAPI routes</text>
+        <text x="450" y="195" text-anchor="middle" font-size="11" fill="var(--text-3)">Thin handlers · role check on every route (403 if disallowed)</text>
+
+        <!-- arrow API -> services -->
+        <line x1="450" y1="210" x2="450" y2="270" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="466" y="245" text-anchor="start" font-size="11" fill="var(--text-3)">org_id passed explicitly — never inferred, never optional</text>
+
+        <!-- Services outer -->
+        <rect x="140" y="272" width="620" height="150" rx="10" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"></rect>
+        <text x="160" y="296" font-size="11" font-weight="700" fill="var(--text-3)" letter-spacing="0.04em">SERVICES — DOMAIN LOGIC</text>
+
+        <!-- solid vertical-slice chips row -->
+        <rect x="160" y="308" width="128" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="224" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Auth · RBAC</text>
+
+        <rect x="298" y="308" width="168" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="382" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Lifecycle + approval</text>
+
+        <rect x="476" y="308" width="112" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="532" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Matcher</text>
+
+        <rect x="598" y="308" width="122" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="659" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Assignments</text>
+
+        <!-- dashed scaffolding chip -->
+        <rect x="160" y="364" width="560" height="40" rx="7" fill="none" stroke="var(--text-3)" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+        <text x="440" y="388" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text-2)">Crew CRUD — profiles, skills, availability (lighter-effort scaffolding)</text>
+
+        <!-- arrow services -> models -->
+        <line x1="450" y1="422" x2="450" y2="462" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="466" y="447" text-anchor="start" font-size="11" fill="var(--text-3)">org-scoped queries only</text>
+
+        <!-- Models -->
+        <rect x="250" y="464" width="400" height="58" rx="10" fill="var(--surface-2)" stroke="var(--border)" stroke-width="1.5"></rect>
+        <text x="450" y="489" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--text)">Models — SQLModel</text>
+        <text x="450" y="507" text-anchor="middle" font-size="11" fill="var(--text-3)">SQLite · org_id required on every table</text>
+
+        <!-- legend -->
+        <line x1="330" y1="556" x2="366" y2="556" stroke="var(--accent-be)" stroke-width="2"></line>
+        <text x="376" y="560" font-size="11" fill="var(--text-2)">real, tested vertical slice</text>
+        <line x1="330" y1="580" x2="366" y2="580" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"></line>
+        <text x="376" y="584" font-size="11" fill="var(--text-2)">lighter / mocked-acceptable</text>
+      </svg>
+    </div>
+    <figcaption>Every arrow into the database carries an explicit <code>org_id</code> — tenant isolation is a required parameter on every data-access function, not an optional filter someone could forget. The solid boxes are what's built and tested for real; the dashed one can be thinner if time runs short.</figcaption>
+  </section>
+
+  <section>
+    <h2>Decisions worth knowing before you read the code</h2>
+
+    <div class="decision">
+      <div class="label">Vertical slice</div>
+      <div class="body">
+        <p>Not every FR is built to the same depth. <strong>Real and tested:</strong> auth/RBAC/tenant isolation, the mission lifecycle and its approval gate, the matcher, and assignments — one coherent story: create a mission, match it, propose, accept, approve. <strong>Lighter or mocked where time is short:</strong> crew self-service CRUD (profile, skills, availability). This isn't laziness — it's what "vertical slice over breadth" (the brief's own words) actually means once you commit to it.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Auth</div>
+      <div class="body">
+        <p>One real login endpoint, <code>POST /auth/login</code> (email + password, hashed at rest), issues an opaque bearer token. Both clients hit the exact same endpoint — the CLI's <code>login</code> command and the SPA's login form are two front doors on one mechanism, not two auth systems to maintain.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Matcher</div>
+      <div class="body">
+        <p>Two passes per requirement. <strong>Hard filter</strong> — skill at proficiency, no date overlap, no conflicting confirmed assignment — removes anyone who can't do the job. <strong>Weighted score</strong> ranks who's left: proficiency surplus 50%, workload 30%, availability margin 20%, each normalized 0–1. Every eligible candidate comes back, not just a top few — explainability was a stated evaluation criterion, so the reasoning has to be visible, not just the ranking.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Tenant isolation</div>
+      <div class="body">
+        <p>Structural, not just tested: every data-access function takes <code>org_id</code> as a required argument. A query that could span two organisations' data isn't a bug waiting to be caught by a test — it's a function signature that doesn't compile.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <section>
+    <h2>The primary flow end to end</h2>
+    <div class="flow">
+      <div class="step"><span class="who">Lead</span>Create mission + requirements</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Lead</span>Run matcher</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Lead</span>Propose assignment</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Crew</span>Accept</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Lead</span>Submit for approval</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Director</span>Approve <span style="font-weight:500; color: var(--text-3);">(not the creator)</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where each client's authority ends</h2>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Client</th><th>Talks to</th><th>Never does</th></tr>
+        <tr><td><span class="lib mono">CLI</span></td><td class="mono">FastAPI, over HTTP</td><td class="mono">Read the SQLite file directly (FR-18)</td></tr>
+        <tr><td><span class="lib mono">Web UI</span></td><td class="mono">Same FastAPI routes, RPC-style typed client</td><td class="mono">Stand in for CLI coverage — it's additional, not authoritative (§10 #19)</td></tr>
+        <tr><td><span class="lib mono">Services</span></td><td class="mono">Models, with <code>org_id</code> required</td><td class="mono">Trust an <code>org_id</code> from client input (FR-1)</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Companion to <code>docs/prd/mission-control.md</code> (the full design document) and the
+    <a href="https://claude.ai/code/artifact/de0b0bf5-d39d-4a2b-8392-1ac4339bd93a">SPA mockups</a>.
+    FR numbers above refer to §6 of the PRD.
+  </footer>
+
+</div>

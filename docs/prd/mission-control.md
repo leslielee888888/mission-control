@@ -11,9 +11,10 @@
   Mutinex's brief asks for — the artifact "you would use to communicate the intended
   solution to an engineering team and guide an AI coding agent" — submitted alongside
   the code and transcripts.
-- **Explainer artifact:** N/A — solo take-home challenge, no team to onboard separately;
-  this PRD is itself the document that guides the AI coding agent and the eventual
-  reviewer.
+- **Explainer artifact:** [Mission Control Architecture](https://claude.ai/code/artifact/e14d23aa-0235-4a6d-9bee-1be3edaa7895)
+  — the FE/BE stack and why, the layered request flow, and the vertical-slice/
+  scaffolding boundary from grilling, as a fast visual read alongside this PRD's full
+  detail (source: `docs/design/architecture-explainer.html`).
 - **Design:** Primary workflows are exercised through a CLI (§7); the brief states "a
   web interface is not required," and the CLI remains the system of record for that
   coverage. A deliberately minimal React SPA (FR-21, §7) is also included — not
@@ -256,6 +257,9 @@ but only the former needs test evidence.
   response.
 
 ## 7. UX
+
+Explainer artifact: [Mission Control Architecture](https://claude.ai/code/artifact/e14d23aa-0235-4a6d-9bee-1be3edaa7895)
+— stack choices and the layered request flow, a faster read than this section's detail.
 
 CLI-only (`missionctl`) is the primary interface, talking to a local FastAPI service
 over HTTP and printing pretty-printed JSON (§10 #15). Grouped by workflow, each
