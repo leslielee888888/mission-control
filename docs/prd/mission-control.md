@@ -309,6 +309,24 @@ settings, no screens beyond these two — this is a state-management showcase (�
   classes are fast to build 2-3 screens with and skip hand-rolling a component
   stylesheet nobody will reuse past this showcase. Matches Mutinex's internal stack
   (TypeScript, React, Python, GCP).
+- **Coding constraints (backend).** Decided up front so `python-programmer` isn't
+  guessing mid-task:
+  - **Synchronous, not async.** Plain `def` route handlers and a synchronous
+    SQLAlchemy session — at this scale (tens of crew, single-digit requests) async
+    buys nothing and an async SQLite driver (`aiosqlite`) is one more thing that can
+    go wrong in a 3–5h build. Revisit only if a real concurrency need shows up.
+  - **Type hints on every function signature**, checked by the editor/IDE as you
+    go — not wired into a separate CI type-check step (`mypy`/`pyright`); one more
+    tool to configure that doesn't change what ships, given the timebox.
+  - **`ruff`** for both lint and format — one tool, one config file, not a
+    lint/format pair to keep in sync.
+  - **No bare `except:`.** Every caught exception is either handled meaningfully or
+    re-raised — silently swallowing one is how FR-20's "no stack traces leaked, full
+    detail logged server-side" quietly stops being true.
+  - **Tests run against a real temporary SQLite database, not mocks** — a fresh file
+    (or in-memory DB) per test session via a `pytest` fixture. Mocking the DB layer
+    would mean the "representative test cases" (§10 #17) prove the mocks behave as
+    expected, not that tenant isolation or the state machine actually hold.
 - **No external infrastructure.** SQLite file, no queue, no cache, no cloud dependency —
   deliberately, given the timebox and "easy to run locally" requirement.
 - **Auth is intentionally minimal.** A real `POST /auth/login` (email + password)
@@ -439,6 +457,9 @@ Project: [Mission Control](https://github.com/leslielee888888/mission-control/pr
 - [ ] Invalid input → 422 with field-level messages (FR-20)
 - [ ] Unhandled error → generic 500, full detail logged server-side, never leaked (FR-20)
 - [ ] Seed script skeleton (fleshed out in T9)
+- [ ] Synchronous route handlers + synchronous SQLAlchemy session (§8 coding constraints)
+- [ ] `ruff` configured for lint + format; type hints on all function signatures
+- [ ] `pytest` fixture standing up a real temporary SQLite DB per test session (not mocked)
 
 ### T2 — Auth + RBAC + tenant scoping
 
