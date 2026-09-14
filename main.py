@@ -8,6 +8,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from api.errors import register_exception_handlers
+from api.routes.assignment import router as assignment_router
 from api.routes.auth import router as auth_router
 from api.routes.crew import router as crew_router
 from api.routes.health import router as health_router
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
     app.include_router(crew_router)
     app.include_router(mission_router)
     app.include_router(match_router)
+    app.include_router(assignment_router)
 
     # No table creation here, deliberately: creating tables is the seed
     # script's job (`scripts/seed.py`), not a side effect of importing or
