@@ -274,5 +274,132 @@ def availability_list() -> None:
     _print_json(_handle_response(response))
 
 
+# --- missions: lifecycle + approval gate (FR-8/FR-9/FR-10/FR-11/FR-12) -----
+
+mission_app = typer.Typer(
+    help="Mission CRUD, requirements, and the 6-state lifecycle (FR-8..FR-12)."
+)
+app.add_typer(mission_app, name="mission")
+
+
+@mission_app.command("create")
+def mission_create(name: str, description: str, start: str, end: str) -> None:
+    """Create a mission (Mission Lead or Director); starts in `draft`, as
+    YYYY-MM-DD dates."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions",
+        json={"name": name, "description": description, "start_date": start, "end_date": end},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("add-requirement")
+def mission_add_requirement(
+    mission_id: int, skill_id: int, min_proficiency: int, headcount: int
+) -> None:
+    """Attach a requirement (skill, minimum proficiency, headcount) to a
+    `draft` mission."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/requirements",
+        json={"skill_id": skill_id, "min_proficiency": min_proficiency, "headcount": headcount},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("submit")
+def mission_submit(mission_id: int) -> None:
+    """Submit a `draft` mission for approval (creator only)."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/submit",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("approve")
+def mission_approve(mission_id: int) -> None:
+    """Approve a `pending_approval` mission (Director, not its creator)."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/approve",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("reject")
+def mission_reject(
+    mission_id: int,
+    reason: str = typer.Option(..., "--reason", help="Why the mission is being rejected."),
+) -> None:
+    """Reject a `pending_approval` mission back to `draft` (Director, not
+    its creator); requires a reason."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/reject",
+        json={"reason": reason},
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("activate")
+def mission_activate(mission_id: int) -> None:
+    """Activate an `approved` mission (Mission Lead or Director)."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/activate",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("complete")
+def mission_complete(mission_id: int) -> None:
+    """Complete an `active` mission (Mission Lead or Director)."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/complete",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("cancel")
+def mission_cancel(mission_id: int) -> None:
+    """Cancel a mission from any pre-completed state (Mission Lead or
+    Director)."""
+    session_data = _require_session()
+    response = httpx.post(
+        f"{_api_base_url()}/missions/{mission_id}/cancel",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("show")
+def mission_show(mission_id: int) -> None:
+    """Show a mission's status, requirements, and fulfillment (FR-17)."""
+    session_data = _require_session()
+    response = httpx.get(
+        f"{_api_base_url()}/missions/{mission_id}",
+        headers=_auth_headers(session_data),
+    )
+    _print_json(_handle_response(response))
+
+
+@mission_app.command("list")
+def mission_list() -> None:
+    """List missions in your org."""
+    session_data = _require_session()
+    response = httpx.get(f"{_api_base_url()}/missions", headers=_auth_headers(session_data))
+    _print_json(_handle_response(response))
+
+
 if __name__ == "__main__":
     app()
