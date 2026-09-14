@@ -161,7 +161,8 @@
   .tablegrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 980px; margin: 0 auto; }
   @media (max-width: 700px) { .tablegrid { grid-template-columns: 1fr; } }
   .tcard { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
-  .tcard .tname { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 600; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); color: var(--text); }
+  .tcard .tname { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 600; padding: 12px 16px 2px 16px; background: var(--surface-2); color: var(--text); }
+  .tcard .tdesc { font-size: 11.5px; line-height: 1.5; padding: 0 16px 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
   .tcard table { width: 100%; font-size: 12px; }
   .tcard th, .tcard td { padding: 7px 16px; border-bottom: 1px solid var(--border); }
   .tcard tr:last-child td { border-bottom: none; }
@@ -415,6 +416,7 @@
 
       <div class="tcard">
         <div class="tname">organizations</div>
+        <div class="tdesc">The tenant boundary. Every other table traces back to one of these, directly or through a foreign-key chain — this is what "data must never leak across tenants" is scoped to.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>name</th><td class="note">text</td></tr>
@@ -424,6 +426,7 @@
 
       <div class="tcard">
         <div class="tname">users</div>
+        <div class="tdesc">Every person who can log in, across all three roles. Identity and auth live here regardless of what a person is allowed to do — that's RBAC's job, not this table's.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>org_id</th><td class="field fk">FK → organizations</td></tr>
@@ -436,6 +439,7 @@
 
       <div class="tcard">
         <div class="tname">crew_profiles</div>
+        <div class="tdesc">The crew-specific extension of a user — one-to-one, and only ever created for the crew_member role, since Directors and Leads are never matchable (§10 #11).</div>
         <table>
           <tr><th>user_id</th><td class="field pk fk">PK, FK → users</td></tr>
           <tr><th>contact</th><td class="note">nullable</td></tr>
@@ -445,6 +449,7 @@
 
       <div class="tcard">
         <div class="tname">skills</div>
+        <div class="tdesc">An org's own taxonomy. Each org defines its list independently — the same skill name in two orgs is two unrelated rows, never a shared one.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>org_id</th><td class="field fk">FK → organizations</td></tr>
@@ -455,6 +460,7 @@
 
       <div class="tcard">
         <div class="tname">crew_skills</div>
+        <div class="tdesc">The join between a crew member and a skill they hold, at a proficiency level — this is the row the matcher's retrieval stage actually queries first.</div>
         <table>
           <tr><th>crew_id</th><td class="field fk">FK → crew_profiles</td></tr>
           <tr><th>skill_id</th><td class="field fk">FK → skills</td></tr>
@@ -465,6 +471,7 @@
 
       <div class="tcard">
         <div class="tname">availability_windows</div>
+        <div class="tdesc">Dates a crew member is <em>unavailable</em>. No row for a given date range means available by default — this table only ever records the exception.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>crew_id</th><td class="field fk">FK → crew_profiles</td></tr>
@@ -475,6 +482,7 @@
 
       <div class="tcard">
         <div class="tname">missions</div>
+        <div class="tdesc">One mission in one org, moving through the six-state lifecycle (draft → … → completed, or cancelled) — the record everything else in the system is ultimately staffing.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>org_id</th><td class="field fk">FK → organizations</td></tr>
@@ -487,6 +495,7 @@
 
       <div class="tcard">
         <div class="tname">requirements</div>
+        <div class="tdesc">One staffing need on a mission — a skill, a minimum proficiency, a headcount. This is the unit the matcher actually runs against, one requirement at a time.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>mission_id</th><td class="field fk">FK → missions</td></tr>
@@ -498,6 +507,7 @@
 
       <div class="tcard">
         <div class="tname">assignments</div>
+        <div class="tdesc">A crew member proposed — and possibly confirmed or declined — against one requirement. The actual output of the matching-and-approval workflow, not just a join table.</div>
         <table>
           <tr><th>id</th><td class="field pk">PK</td></tr>
           <tr><th>requirement_id</th><td class="field fk">FK → requirements</td></tr>
@@ -510,6 +520,7 @@
 
       <div class="tcard">
         <div class="tname">auth_tokens</div>
+        <div class="tdesc">The hashed bearer token issued at login (§10 #24) — the one thing every authenticated request from either client carries.</div>
         <table>
           <tr><th>token_hash</th><td class="field pk">PK</td></tr>
           <tr><th>user_id</th><td class="field fk">FK → users</td></tr>
