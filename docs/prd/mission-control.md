@@ -1,6 +1,8 @@
 # PRD: Mission Control
 
-- **Status:** `Draft` → `Discovery` → `In development` → `Refinement` → **`Finalize`** → `Shipped`
+- **Status:** `Draft` → `Discovery` → `In development` → `Refinement` → `Finalize` → **`Shipped`**
+  ([v1.0.0](https://github.com/leslielee888888/mission-control/releases/tag/v1.0.0),
+  merged via [PR #22](https://github.com/leslielee888888/mission-control/pull/22))
 - **Author:** Leslie
 - **Repo:** [`leslielee888888/mission-control`](https://github.com/leslielee888888/mission-control) — new
   standalone repo, created for this challenge. This doc, the source code, and the full
