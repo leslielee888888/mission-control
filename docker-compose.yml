@@ -1,0 +1,25 @@
+services:
+  api:
+    image: ghcr.io/leslielee888888/mission-control-api:${API_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8100}:8000"
+    environment:
+      # Absolute path into the named volume below - keeps the sqlite file
+      # off the image layer and off the WORKDIR the image code lives in.
+      MISSION_CONTROL_DATABASE_URL: sqlite:////data/mission_control.db
+    volumes:
+      - data:/data
+
+  web:
+    # A separate tag from the API: VITE_API_BASE_URL is baked into the
+    # static JS bundle at *build* time, so this image is specific to where
+    # the API is actually reachable from a browser on this network - not
+    # interchangeable with the :latest build used for local dev.
+    image: ghcr.io/leslielee888888/mission-control-web:${WEB_IMAGE_TAG:-nas}
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8101}:80"
+
+volumes:
+  data:
