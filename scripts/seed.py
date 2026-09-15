@@ -32,8 +32,8 @@ once, on first start — see that file.)
 
 from __future__ import annotations
 
+import hashlib
 import itertools
-import secrets
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -85,6 +85,24 @@ def _reset_database_file() -> None:
         db_path.unlink()
 
 
+def _demo_password(email: str) -> str:
+    """Derive a stable demo password from a user's email.
+
+    Deliberately a deterministic function of the email, not
+    ``secrets.token_urlsafe`` — the seed script runs independently on every
+    machine (local checkout, CI, the NAS), and a randomly generated password
+    is different every time, which was a real source of login confusion (the
+    NAS's password for a user never matched the one in a local checkout's
+    ``seed_credentials.txt``, or the reverse). Deriving it from the email
+    instead means the same demo user has the same password everywhere, while
+    still being unique per user and unguessable without the seed file. Not a
+    real credential (this is demo data, §8's threat model doesn't cover it)
+    so a keyed hash rather than a proper KDF is fine here.
+    """
+    digest = hashlib.sha256(f"mission-control-demo:{email}".encode()).hexdigest()
+    return f"Demo-{digest[:12]}"
+
+
 def _new_user(
     session: Session,
     *,
@@ -94,11 +112,11 @@ def _new_user(
     email: str,
     credentials: list[SeededCredential],
 ) -> User:
-    """Create one login with a freshly generated demo password, recording it
-    in ``credentials`` for the end-of-run report (§10 #24 — real, usable
-    passwords, not blank ones)."""
+    """Create one login with a demo password derived from the user's email
+    (see ``_demo_password``), recording it in ``credentials`` for the
+    end-of-run report (§10 #24 — real, usable passwords, not blank ones)."""
     assert org.id is not None
-    password = secrets.token_urlsafe(9)
+    password = _demo_password(email)
     user = User(
         org_id=org.id,
         email=email,
