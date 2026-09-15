@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.db
+*.db-journal
+seed_credentials.txt
+.env
+.git/
+.github/
+docs/
+transcripts/
+web/
+tests/
+.claude/

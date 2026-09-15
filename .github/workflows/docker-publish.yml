@@ -1,0 +1,90 @@
+name: Publish Docker images
+
+# Builds and pushes the API and SPA images to GitHub Container Registry.
+# GHCR, not Docker Hub or GCP Artifact Registry: it needs zero new accounts
+# or secrets - the built-in GITHUB_TOKEN (granted `packages: write` below)
+# is enough, since this is already a GitHub repo. Runs after CI's checks
+# would already have passed on the same commit (this workflow doesn't
+# re-lint/re-test - ci.yml is the gate; this is publish-only).
+#
+# `:latest` is reserved for `main` (docker/metadata-action's
+# `is_default_branch`): every push, including a task/feature branch
+# mid-Development, still gets an immutable `:<sha>` tag, but only a merge to
+# `main` moves `:latest` - so a `docker compose pull` against `:latest` (the
+# NAS's default, docker-compose.yml) always lands on a vetted main-branch
+# release, never an in-progress feature-branch build. Found in Finalize
+# code review; before this, every push to feature/mission-control also
+# clobbered `:latest`.
+
+on:
+  push:
+    branches: [main, feature/mission-control]
+  workflow_dispatch: {}
+
+env:
+  REGISTRY: ghcr.io
+  API_IMAGE: ${{ github.repository }}-api
+  WEB_IMAGE: ${{ github.repository }}-web
+
+jobs:
+  api:
+    name: Build + push API image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  web:
+    name: Build + push SPA image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: web
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

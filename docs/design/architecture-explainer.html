@@ -1,0 +1,772 @@
+<title>Mission Control Architecture</title>
+<style>
+  :root {
+    --bg: oklch(98% 0.004 250);
+    --surface: oklch(100% 0 0);
+    --surface-2: oklch(96% 0.006 250);
+    --border: oklch(89% 0.008 250);
+    --text: oklch(20% 0.02 250);
+    --text-2: oklch(46% 0.015 250);
+    --text-3: oklch(60% 0.012 250);
+    --accent-be: oklch(55% 0.16 230);
+    --accent-be-bg: oklch(94% 0.03 230);
+    --accent-fe: oklch(52% 0.12 190);
+    --accent-fe-bg: oklch(93% 0.028 190);
+    --accent-cli: oklch(38% 0.015 250);
+    --accent-cli-bg: oklch(93% 0.006 250);
+    --ok: oklch(55% 0.13 165);
+    --ok-bg: oklch(93% 0.03 165);
+    --warn: oklch(60% 0.15 80);
+    --warn-bg: oklch(94% 0.04 80);
+    --shadow: 0 1px 2px oklch(0% 0 0 / 0.05), 0 8px 24px oklch(0% 0 0 / 0.04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: oklch(17% 0.012 250);
+      --surface: oklch(21% 0.014 250);
+      --surface-2: oklch(25% 0.015 250);
+      --border: oklch(32% 0.016 250);
+      --text: oklch(93% 0.006 250);
+      --text-2: oklch(74% 0.012 250);
+      --text-3: oklch(58% 0.012 250);
+      --accent-be: oklch(72% 0.13 230);
+      --accent-be-bg: oklch(28% 0.05 230);
+      --accent-fe: oklch(74% 0.1 190);
+      --accent-fe-bg: oklch(27% 0.045 190);
+      --accent-cli: oklch(86% 0.008 250);
+      --accent-cli-bg: oklch(28% 0.01 250);
+      --ok: oklch(72% 0.12 165);
+      --ok-bg: oklch(27% 0.045 165);
+      --warn: oklch(78% 0.13 80);
+      --warn-bg: oklch(30% 0.05 80);
+      --shadow: 0 1px 2px oklch(0% 0 0 / 0.3), 0 8px 24px oklch(0% 0 0 / 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: oklch(17% 0.012 250);
+    --surface: oklch(21% 0.014 250);
+    --surface-2: oklch(25% 0.015 250);
+    --border: oklch(32% 0.016 250);
+    --text: oklch(93% 0.006 250);
+    --text-2: oklch(74% 0.012 250);
+    --text-3: oklch(58% 0.012 250);
+    --accent-be: oklch(72% 0.13 230);
+    --accent-be-bg: oklch(28% 0.05 230);
+    --accent-fe: oklch(74% 0.1 190);
+    --accent-fe-bg: oklch(27% 0.045 190);
+    --accent-cli: oklch(86% 0.008 250);
+    --accent-cli-bg: oklch(28% 0.01 250);
+    --ok: oklch(72% 0.12 165);
+    --ok-bg: oklch(27% 0.045 165);
+    --warn: oklch(78% 0.13 80);
+    --warn-bg: oklch(30% 0.05 80);
+    --shadow: 0 1px 2px oklch(0% 0 0 / 0.3), 0 8px 24px oklch(0% 0 0 / 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { color-scheme: light dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+    padding: 0 20px;
+  }
+  a { color: var(--accent-be); }
+  a:hover { color: var(--accent-fe); }
+  code, .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  h1, h2, h3 { text-wrap: balance; }
+  .wrap { max-width: 860px; margin: 0 auto; padding-block: 56px 80px; }
+  .wide { max-width: 980px; }
+  p { line-height: 1.65; color: var(--text-2); }
+  p, li { max-width: 68ch; }
+  .lede { font-size: 17px; color: var(--text); }
+
+  .eyebrow {
+    font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-be);
+  }
+  h1 { font-size: clamp(28px, 4vw, 38px); margin: 10px 0 6px 0; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 21px; margin: 0 0 14px 0; font-weight: 700; }
+  h3 { font-size: 15px; margin: 0 0 8px 0; font-weight: 700; }
+
+  .meta { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+  .meta a { color: var(--text-3); text-decoration: underline; }
+
+  section { margin-top: 52px; }
+  section:first-of-type { margin-top: 36px; }
+
+  .stackrow {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+    max-width: 980px; margin: 0 auto;
+  }
+  @media (max-width: 760px) { .stackrow { grid-template-columns: 1fr; } }
+  .stackcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .stackcard .tag {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+    letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 10px; border-radius: 100px;
+    margin-bottom: 12px;
+  }
+  .tag.be { background: var(--accent-be-bg); color: var(--accent-be); }
+  .tag.fe { background: var(--accent-fe-bg); color: var(--accent-fe); }
+  .tag.cli { background: var(--accent-cli-bg); color: var(--accent-cli); }
+  .stackcard ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .stackcard li { display: flex; flex-direction: column; gap: 2px; }
+  .stackcard .lib { font-weight: 600; font-size: 14px; color: var(--text); }
+  .stackcard .why { font-size: 12.5px; color: var(--text-3); line-height: 1.5; }
+
+  figure { margin: 0; }
+  figcaption { font-size: 12.5px; color: var(--text-3); text-align: center; margin-top: 14px; max-width: 60ch; margin-inline: auto; }
+  .diagram-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 28px 20px 20px 20px; box-shadow: var(--shadow); }
+  svg.arch { width: 100%; height: auto; display: block; }
+
+  .legend { display: flex; gap: 22px; justify-content: center; flex-wrap: wrap; margin-top: 16px; font-size: 12px; color: var(--text-2); }
+  .legend .key { display: inline-flex; align-items: center; gap: 7px; }
+  .legend .swatch { width: 20px; height: 10px; border-radius: 3px; flex: none; }
+
+  .decision {
+    display: grid; grid-template-columns: 160px 1fr; gap: 18px 24px; align-items: start;
+    padding: 18px 0; border-top: 1px solid var(--border);
+  }
+  .decision:first-of-type { border-top: none; }
+  @media (max-width: 640px) { .decision { grid-template-columns: 1fr; gap: 6px; } }
+  .decision .label { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); padding-top: 3px; }
+  .decision .body p { margin: 0 0 8px 0; }
+  .decision .body p:last-child { margin-bottom: 0; }
+  .decision .body code { background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 0.92em; }
+
+  .flow {
+    display: flex; align-items: center; gap: 0; flex-wrap: wrap; justify-content: center;
+    margin: 0 auto; max-width: 980px;
+  }
+  .flow .step {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; font-size: 12.5px; font-weight: 600; text-align: center; box-shadow: var(--shadow);
+    min-width: 108px;
+  }
+  .flow .step .who { display: block; font-size: 10.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .flow .arrow { color: var(--text-3); padding: 0 6px; font-size: 15px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-3); font-weight: 600; }
+  td.mono { color: var(--text-2); }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow); }
+  .table-wrap table { margin: 0; }
+  .table-wrap th, .table-wrap td { padding: 12px 16px; }
+
+  .tablegrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 980px; margin: 0 auto; }
+  @media (max-width: 700px) { .tablegrid { grid-template-columns: 1fr; } }
+  .tcard { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+  .tcard .tname { font-family: "IBM Plex Mono", monospace; font-size: 13px; font-weight: 600; padding: 12px 16px 2px 16px; background: var(--surface-2); color: var(--text); }
+  .tcard .tdesc { font-size: 11.5px; line-height: 1.5; padding: 0 16px 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
+  .tcard table { width: 100%; font-size: 12px; }
+  .tcard th, .tcard td { padding: 7px 16px; border-bottom: 1px solid var(--border); }
+  .tcard tr:last-child td { border-bottom: none; }
+  .tcard th { font-weight: 600; color: var(--text-3); width: 34%; }
+  .tcard td.field { font-family: "IBM Plex Mono", monospace; color: var(--text); }
+  .tcard td.note { color: var(--text-2); }
+  .pk { color: var(--accent-be); font-weight: 700; }
+  .fk { color: var(--accent-fe); font-weight: 600; }
+
+  footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-3); }
+  footer a { color: var(--text-3); }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div class="wrap">
+
+  <div class="eyebrow">Explainer artifact · companion to the PRD</div>
+  <h1>Mission Control — architecture &amp; stack</h1>
+  <div class="meta">How the pieces fit together and why each library was chosen. Full requirements live in <code>docs/prd/mission-control.md</code>; this page is the fast read.</div>
+
+  <section>
+    <p class="lede">Mission Control is one API with three clients. A CLI and a minimal web UI both talk to the same FastAPI service over HTTP — neither reads the database directly, and neither gets its own copy of business logic. The API is layered (routes → services → models) so the rules that matter — tenant isolation, the approval gate, the matcher — live in exactly one place.</p>
+  </section>
+
+  <section>
+    <h2>Stack, and why</h2>
+    <div class="stackrow">
+
+      <div class="stackcard">
+        <div class="tag be">Backend</div>
+        <ul>
+          <li><span class="lib">FastAPI</span><span class="why">Type-hinted routes, automatic OpenAPI — the schema the SPA's typed client is generated from.</span></li>
+          <li><span class="lib">SQLModel</span><span class="why">SQLAlchemy + Pydantic in one model — one class defines the table and the validation.</span></li>
+          <li><span class="lib">SQLite</span><span class="why">Genuinely relational domain (orgs, crew, missions, requirements, assignments with real foreign keys) — no external service to install for a take-home.</span></li>
+          <li><span class="lib">pytest</span><span class="why">Representative cases over the vertical slice, not exhaustive suites — see the coverage boundary below.</span></li>
+          <li><span class="lib">bcrypt</span><span class="why">Password hashing for the real login endpoint — see the auth note below.</span></li>
+        </ul>
+      </div>
+
+      <div class="stackcard">
+        <div class="tag fe">Frontend (showcase)</div>
+        <ul>
+          <li><span class="lib">React + Vite</span><span class="why">Fast dev loop for a handful of screens — no framework machinery this build doesn't need.</span></li>
+          <li><span class="lib">React Query</span><span class="why">Server state — loading/error/stale states and cache invalidation on mutation, which is the whole point of the showcase.</span></li>
+          <li><span class="lib">Generated typed client</span><span class="why">From FastAPI's OpenAPI schema — calls read as <code>api.mission.approve(id)</code>, RPC-flavored, no second protocol.</span></li>
+          <li><span class="lib">useState</span><span class="why">Local UI state only — no Redux/Zustand for three screens.</span></li>
+          <li><span class="lib">Tailwind CSS</span><span class="why">Utility classes are fast for 2-3 screens — no component stylesheet to maintain past this showcase.</span></li>
+        </ul>
+      </div>
+
+      <div class="stackcard">
+        <div class="tag cli">CLI</div>
+        <ul>
+          <li><span class="lib">Typer</span><span class="why">Pairs naturally with FastAPI's type hints and Pydantic schemas — same mental model, both ends.</span></li>
+          <li><span class="lib">httpx</span><span class="why">The CLI's HTTP client — every command is a real request, never a DB shortcut.</span></li>
+          <li><span class="lib">missionctl</span><span class="why">System of record for full workflow coverage; JSON output, pretty-printed.</span></li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="wide">
+    <h2>How a request moves through the system</h2>
+    <div class="diagram-wrap">
+      <svg class="arch" viewBox="0 0 900 610" role="img" aria-label="Two clients, the CLI and the web UI, both send authenticated HTTP requests to one FastAPI layer. It calls into a services layer, passing org_id explicitly. The services layer holds the real, tested vertical slice — auth and RBAC, mission lifecycle and approval, the matcher, and assignments — drawn solid, plus crew CRUD, drawn dashed as lighter-effort scaffolding. Services query the SQLite database through org-scoped queries.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- Clients -->
+        <rect x="70" y="28" width="230" height="58" rx="10" fill="var(--accent-cli-bg)" stroke="var(--accent-cli)" stroke-width="1.5"></rect>
+        <text x="185" y="52" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--accent-cli)">CLI</text>
+        <text x="185" y="70" text-anchor="middle" font-size="11" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">missionctl</text>
+
+        <rect x="600" y="28" width="230" height="58" rx="10" fill="var(--accent-fe-bg)" stroke="var(--accent-fe)" stroke-width="1.5"></rect>
+        <text x="715" y="52" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--accent-fe)">Web UI</text>
+        <text x="715" y="70" text-anchor="middle" font-size="11" fill="var(--text-3)">React SPA · showcase only</text>
+
+        <!-- arrows clients -> API -->
+        <line x1="200" y1="86" x2="330" y2="148" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <line x1="710" y1="86" x2="580" y2="148" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="450" y="118" text-anchor="middle" font-size="11.5" fill="var(--text-3)">HTTPS + bearer token (same login endpoint, both clients)</text>
+
+        <!-- API -->
+        <rect x="200" y="150" width="500" height="60" rx="10" fill="var(--accent-be-bg)" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="450" y="176" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--accent-be)">API — FastAPI routes</text>
+        <text x="450" y="195" text-anchor="middle" font-size="11" fill="var(--text-3)">Thin handlers · role check on every route (403 if disallowed)</text>
+
+        <!-- arrow API -> services -->
+        <line x1="450" y1="210" x2="450" y2="270" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="466" y="245" text-anchor="start" font-size="11" fill="var(--text-3)">org_id passed explicitly — never inferred, never optional</text>
+
+        <!-- Services outer -->
+        <rect x="140" y="272" width="620" height="150" rx="10" fill="var(--surface)" stroke="var(--border)" stroke-width="1.5"></rect>
+        <text x="160" y="296" font-size="11" font-weight="700" fill="var(--text-3)" letter-spacing="0.04em">SERVICES — DOMAIN LOGIC</text>
+
+        <!-- solid vertical-slice chips row -->
+        <rect x="160" y="308" width="128" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="224" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Auth · RBAC</text>
+
+        <rect x="298" y="308" width="168" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="382" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Lifecycle + approval</text>
+
+        <rect x="476" y="308" width="112" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="532" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Matcher</text>
+
+        <rect x="598" y="308" width="122" height="42" rx="7" fill="none" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="659" y="333" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text)">Assignments</text>
+
+        <!-- dashed scaffolding chip -->
+        <rect x="160" y="364" width="560" height="40" rx="7" fill="none" stroke="var(--text-3)" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+        <text x="440" y="388" text-anchor="middle" font-size="11.5" font-weight="600" fill="var(--text-2)">Crew CRUD — profiles, skills, availability (lighter-effort scaffolding)</text>
+
+        <!-- arrow services -> models -->
+        <line x1="450" y1="422" x2="450" y2="462" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow)"></line>
+        <text x="466" y="447" text-anchor="start" font-size="11" fill="var(--text-3)">org-scoped queries only</text>
+
+        <!-- Models -->
+        <rect x="250" y="464" width="400" height="58" rx="10" fill="var(--surface-2)" stroke="var(--border)" stroke-width="1.5"></rect>
+        <text x="450" y="489" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--text)">Models — SQLModel</text>
+        <text x="450" y="507" text-anchor="middle" font-size="11" fill="var(--text-3)">SQLite · org_id required on every table</text>
+
+        <!-- legend -->
+        <line x1="330" y1="556" x2="366" y2="556" stroke="var(--accent-be)" stroke-width="2"></line>
+        <text x="376" y="560" font-size="11" fill="var(--text-2)">real, tested vertical slice</text>
+        <line x1="330" y1="580" x2="366" y2="580" stroke="var(--text-3)" stroke-width="2" stroke-dasharray="5 4"></line>
+        <text x="376" y="584" font-size="11" fill="var(--text-2)">lighter / mocked-acceptable</text>
+      </svg>
+    </div>
+    <figcaption>Every arrow into the database carries an explicit <code>org_id</code> — tenant isolation is a required parameter on every data-access function, not an optional filter someone could forget. The solid boxes are what's built and tested for real; the dashed one can be thinner if time runs short.</figcaption>
+  </section>
+
+  <section class="wide">
+    <h2>The data model</h2>
+    <p>Ten tables. Every arrow below is a foreign key; <code>org_id</code> sits on every org-scoped table so a query can't accidentally cross tenants. <span class="pk mono">■</span> primary key &nbsp; <span class="fk mono">■</span> foreign key.</p>
+    <div class="diagram-wrap">
+      <svg class="arch" viewBox="0 0 1060 600" role="img" aria-label="Ten tables: organizations is the tenant root, with users, skills, and missions each carrying its org_id. users links one-to-one to crew_profiles for crew members, which link to availability_windows and, through crew_skills, to skills. missions link to requirements, which reference skills and link to assignments, which reference crew_profiles. Every join is a foreign key shown on the arrow.">
+        <defs>
+          <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- organizations -->
+        <rect x="40" y="30" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="56" y="52" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">organizations</text>
+        <text x="56" y="70" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK</text>
+        <text x="56" y="83" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">name</text>
+
+        <!-- skills -->
+        <rect x="720" y="30" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="736" y="52" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">skills</text>
+        <text x="736" y="70" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK · <tspan class="fk">org_id</tspan> FK</text>
+        <text x="736" y="83" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">name · category · unique(org_id,name)</text>
+
+        <!-- users -->
+        <rect x="40" y="170" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="56" y="192" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">users</text>
+        <text x="56" y="210" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK · <tspan class="fk">org_id</tspan> FK</text>
+        <text x="56" y="223" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">email · role · password_hash</text>
+
+        <!-- missions -->
+        <rect x="720" y="170" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="736" y="192" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">missions</text>
+        <text x="736" y="210" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK · <tspan class="fk">org_id</tspan>/<tspan class="fk">created_by</tspan> FK</text>
+        <text x="736" y="223" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">name · dates · status</text>
+
+        <!-- crew_profiles -->
+        <rect x="380" y="170" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="396" y="192" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">crew_profiles</text>
+        <text x="396" y="210" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">user_id</tspan> PK, FK</text>
+        <text x="396" y="223" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">contact · bio (role=crew_member)</text>
+
+        <!-- availability_windows -->
+        <rect x="380" y="310" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="396" y="332" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">availability_windows</text>
+        <text x="396" y="350" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK · <tspan class="fk">crew_id</tspan> FK</text>
+        <text x="396" y="363" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">start_date · end_date</text>
+
+        <!-- requirements -->
+        <rect x="720" y="310" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="736" y="332" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">requirements</text>
+        <text x="736" y="350" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK · <tspan class="fk">mission_id</tspan>/<tspan class="fk">skill_id</tspan> FK</text>
+        <text x="736" y="363" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">min_proficiency · headcount</text>
+
+        <!-- crew_skills -->
+        <rect x="380" y="450" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="396" y="472" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">crew_skills</text>
+        <text x="396" y="490" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="fk">crew_id</tspan>/<tspan class="fk">skill_id</tspan> FK</text>
+        <text x="396" y="503" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">proficiency 1–5 · unique(crew_id,skill_id)</text>
+
+        <!-- assignments -->
+        <rect x="720" y="450" width="230" height="74" rx="8" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="736" y="472" font-size="13" font-weight="700" fill="var(--text)" font-family="IBM Plex Mono, monospace">assignments</text>
+        <text x="736" y="490" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace"><tspan class="pk">id</tspan> PK · <tspan class="fk">requirement_id</tspan>/<tspan class="fk">crew_id</tspan> FK</text>
+        <text x="736" y="503" font-size="9.5" fill="var(--text-3)" font-family="IBM Plex Mono, monospace">status · proposed_at · responded_at</text>
+
+        <!-- 1: org -> users -->
+        <line x1="155" y1="104" x2="155" y2="170" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></line>
+        <text x="165" y="142" font-size="10" fill="var(--text-3)">org_id</text>
+
+        <!-- 2: org -> skills -->
+        <line x1="270" y1="67" x2="720" y2="67" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></line>
+        <text x="480" y="60" font-size="10" fill="var(--text-3)" text-anchor="middle">org_id</text>
+
+        <!-- 3: org -> missions (elbow) -->
+        <polyline points="155,104 155,130 835,130 835,170" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></polyline>
+        <text x="480" y="124" font-size="10" fill="var(--text-3)" text-anchor="middle">org_id</text>
+
+        <!-- 4: users -> crew_profiles -->
+        <line x1="270" y1="207" x2="380" y2="207" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></line>
+        <text x="325" y="200" font-size="10" fill="var(--text-3)" text-anchor="middle">1:1</text>
+
+        <!-- 5: crew_profiles -> availability_windows -->
+        <line x1="495" y1="244" x2="495" y2="310" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></line>
+        <text x="505" y="280" font-size="10" fill="var(--text-3)">crew_id</text>
+
+        <!-- 6: crew_profiles -> crew_skills (around availability_windows) -->
+        <polyline points="380,207 320,207 320,487 380,487" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></polyline>
+        <text x="290" y="350" font-size="10" fill="var(--text-3)" text-anchor="middle" transform="rotate(-90 290 350)">crew_id</text>
+
+        <!-- 7: skills -> crew_skills (left margin, around missions) -->
+        <polyline points="720,55 655,55 655,487 610,487" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></polyline>
+        <text x="645" y="130" font-size="10" fill="var(--text-3)">skill_id</text>
+
+        <!-- 8: missions -> requirements -->
+        <line x1="835" y1="244" x2="835" y2="310" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></line>
+        <text x="845" y="280" font-size="10" fill="var(--text-3)">mission_id</text>
+
+        <!-- 9: skills -> requirements (right margin, around missions) -->
+        <polyline points="950,55 985,55 985,347 950,347" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></polyline>
+        <text x="993" y="200" font-size="10" fill="var(--text-3)">skill_id</text>
+
+        <!-- 10: requirements -> assignments -->
+        <line x1="835" y1="384" x2="835" y2="450" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></line>
+        <text x="845" y="420" font-size="10" fill="var(--text-3)">requirement_id</text>
+
+        <!-- 11: crew_profiles -> assignments -->
+        <polyline points="610,207 675,207 675,487 720,487" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"></polyline>
+        <text x="685" y="350" font-size="10" fill="var(--text-3)" text-anchor="middle" transform="rotate(-90 685 350)">crew_id</text>
+
+      </svg>
+    </div>
+    <figcaption>Not pictured: <code>auth_tokens</code> (FK → <code>users</code>) — small enough to skip drawing, listed in the field tables below. Crew-only fields (skills, availability, assignments) hang off <code>crew_profiles</code>, not <code>users</code> directly, since Directors and Mission Leads never get one (§10 #11).</figcaption>
+
+    <div class="tablegrid" style="margin-top: 28px;">
+
+      <div class="tcard">
+        <div class="tname">organizations</div>
+        <div class="tdesc">The tenant boundary. Every other table traces back to one of these, directly or through a foreign-key chain — this is what "data must never leak across tenants" is scoped to.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>name</th><td class="note">text</td></tr>
+          <tr><th>created_at</th><td class="note">timestamp</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">users</div>
+        <div class="tdesc">Every person who can log in, across all three roles. Identity and auth live here regardless of what a person is allowed to do — that's RBAC's job, not this table's.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>org_id</th><td class="field fk">FK → organizations</td></tr>
+          <tr><th>email</th><td class="note">unique</td></tr>
+          <tr><th>password_hash</th><td class="note">bcrypt, never logged</td></tr>
+          <tr><th>role</th><td class="note">director · mission_lead · crew_member</td></tr>
+          <tr><th>name</th><td class="note">text</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">crew_profiles</div>
+        <div class="tdesc">The crew-specific extension of a user — one-to-one, and only ever created for the crew_member role, since Directors and Leads are never matchable (§10 #11).</div>
+        <table>
+          <tr><th>user_id</th><td class="field pk fk">PK, FK → users</td></tr>
+          <tr><th>contact</th><td class="note">nullable</td></tr>
+          <tr><th>bio</th><td class="note">nullable</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">skills</div>
+        <div class="tdesc">An org's own taxonomy. Each org defines its list independently — the same skill name in two orgs is two unrelated rows, never a shared one.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>org_id</th><td class="field fk">FK → organizations</td></tr>
+          <tr><th>name</th><td class="note">unique(org_id, name)</td></tr>
+          <tr><th>category</th><td class="note">free text, nullable</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">crew_skills</div>
+        <div class="tdesc">The join between a crew member and a skill they hold, at a proficiency level — this is the row the matcher's retrieval stage actually queries first.</div>
+        <table>
+          <tr><th>crew_id</th><td class="field fk">FK → crew_profiles</td></tr>
+          <tr><th>skill_id</th><td class="field fk">FK → skills</td></tr>
+          <tr><th>proficiency</th><td class="note">int, 1–5</td></tr>
+          <tr><th>—</th><td class="note">unique(crew_id, skill_id)</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">availability_windows</div>
+        <div class="tdesc">Dates a crew member is <em>unavailable</em>. No row for a given date range means available by default — this table only ever records the exception.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>crew_id</th><td class="field fk">FK → crew_profiles</td></tr>
+          <tr><th>start_date</th><td class="note">date</td></tr>
+          <tr><th>end_date</th><td class="note">date, no overlaps</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">missions</div>
+        <div class="tdesc">One mission in one org, moving through the six-state lifecycle (draft → … → completed, or cancelled) — the record everything else in the system is ultimately staffing.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>org_id</th><td class="field fk">FK → organizations</td></tr>
+          <tr><th>created_by</th><td class="field fk">FK → users</td></tr>
+          <tr><th>name / description</th><td class="note">text</td></tr>
+          <tr><th>start_date / end_date</th><td class="note">date</td></tr>
+          <tr><th>status</th><td class="note">6-state enum, FR-9</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">requirements</div>
+        <div class="tdesc">One staffing need on a mission — a skill, a minimum proficiency, a headcount. This is the unit the matcher actually runs against, one requirement at a time.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>mission_id</th><td class="field fk">FK → missions</td></tr>
+          <tr><th>skill_id</th><td class="field fk">FK → skills</td></tr>
+          <tr><th>min_proficiency</th><td class="note">int, 1–5</td></tr>
+          <tr><th>headcount</th><td class="note">int</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">assignments</div>
+        <div class="tdesc">A crew member proposed — and possibly confirmed or declined — against one requirement. The actual output of the matching-and-approval workflow, not just a join table.</div>
+        <table>
+          <tr><th>id</th><td class="field pk">PK</td></tr>
+          <tr><th>requirement_id</th><td class="field fk">FK → requirements</td></tr>
+          <tr><th>crew_id</th><td class="field fk">FK → crew_profiles</td></tr>
+          <tr><th>proposed_by</th><td class="field fk">FK → users</td></tr>
+          <tr><th>status</th><td class="note">proposed · confirmed · declined</td></tr>
+          <tr><th>proposed_at / responded_at</th><td class="note">timestamp</td></tr>
+        </table>
+      </div>
+
+      <div class="tcard">
+        <div class="tname">auth_tokens</div>
+        <div class="tdesc">The hashed bearer token issued at login (§10 #24) — the one thing every authenticated request from either client carries.</div>
+        <table>
+          <tr><th>token_hash</th><td class="field pk">PK</td></tr>
+          <tr><th>user_id</th><td class="field fk">FK → users</td></tr>
+          <tr><th>created_at</th><td class="note">no expiry (§3 non-goals)</td></tr>
+        </table>
+      </div>
+
+    </div>
+  </section>
+
+  <section class="wide">
+    <h2>Mission lifecycle — the state machine FR-9 enforces</h2>
+    <div class="diagram-wrap">
+      <svg class="arch" viewBox="0 0 1060 340" role="img" aria-label="Mission status moves draft to pending_approval on submit, pending_approval to approved on approve, approved to active on activate, active to completed on complete. Pending_approval can go back to draft on reject. Draft, pending_approval, approved, and active can all move to cancelled; completed cannot. Any transition outside this set is refused with a 409 and the status is unchanged.">
+        <defs>
+          <marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <rect x="30" y="30" width="150" height="56" rx="28" fill="var(--surface-2)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="105" y="63" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--text)">draft</text>
+
+        <rect x="240" y="30" width="170" height="56" rx="28" fill="var(--warn-bg)" stroke="var(--warn)" stroke-width="1.5"></rect>
+        <text x="325" y="63" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--warn)">pending_approval</text>
+
+        <rect x="470" y="30" width="150" height="56" rx="28" fill="var(--ok-bg)" stroke="var(--ok)" stroke-width="1.5"></rect>
+        <text x="545" y="63" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--ok)">approved</text>
+
+        <rect x="680" y="30" width="150" height="56" rx="28" fill="var(--accent-be-bg)" stroke="var(--accent-be)" stroke-width="1.5"></rect>
+        <text x="755" y="63" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--accent-be)">active</text>
+
+        <rect x="890" y="30" width="150" height="56" rx="28" fill="var(--surface-2)" stroke="var(--text-3)" stroke-width="1.5"></rect>
+        <text x="965" y="63" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--text)">completed</text>
+
+        <line x1="180" y1="58" x2="240" y2="58" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow3)"></line>
+        <text x="210" y="45" text-anchor="middle" font-size="10.5" fill="var(--text-2)">submit</text>
+
+        <line x1="410" y1="58" x2="470" y2="58" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow3)"></line>
+        <text x="440" y="45" text-anchor="middle" font-size="10.5" fill="var(--text-2)">approve</text>
+
+        <line x1="620" y1="58" x2="680" y2="58" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow3)"></line>
+        <text x="650" y="45" text-anchor="middle" font-size="10.5" fill="var(--text-2)">activate</text>
+
+        <line x1="830" y1="58" x2="890" y2="58" stroke="currentColor" stroke-width="1.5" marker-end="url(#arrow3)"></line>
+        <text x="860" y="45" text-anchor="middle" font-size="10.5" fill="var(--text-2)">complete</text>
+
+        <path d="M300,86 Q205,140 110,86" fill="none" stroke="var(--warn)" stroke-width="1.5" marker-end="url(#arrow3)"></path>
+        <text x="205" y="150" text-anchor="middle" font-size="10.5" fill="var(--text-2)">reject (reason required)</text>
+
+        <rect x="380" y="230" width="180" height="56" rx="10" fill="var(--surface)" stroke="var(--text-3)" stroke-width="1.5" stroke-dasharray="5 4"></rect>
+        <text x="470" y="263" text-anchor="middle" font-size="12.5" font-weight="700" fill="var(--text-2)">cancelled</text>
+
+        <line x1="105" y1="86" x2="440" y2="230" stroke="var(--text-3)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow3)"></line>
+        <line x1="325" y1="86" x2="465" y2="230" stroke="var(--text-3)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow3)"></line>
+        <line x1="545" y1="86" x2="500" y2="230" stroke="var(--text-3)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow3)"></line>
+        <line x1="755" y1="86" x2="545" y2="230" stroke="var(--text-3)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrow3)"></line>
+        <text x="470" y="310" text-anchor="middle" font-size="10.5" fill="var(--text-3)">cancel — from any pre-completed state (dashed)</text>
+
+      </svg>
+    </div>
+    <figcaption>Six states, seven transitions — anything else (e.g. <code>draft → approved</code>, or <code>completed → active</code>) returns 409 and leaves the status untouched (FR-9). Under-staffing never blocks <code>activate</code> — that's a deliberate choice, not an oversight (§10 #5).</figcaption>
+  </section>
+
+  <section>
+    <h2>Decisions worth knowing before you read the code</h2>
+
+    <div class="decision">
+      <div class="label">Vertical slice</div>
+      <div class="body">
+        <p>Not every FR is built to the same depth. <strong>Real and tested:</strong> auth/RBAC/tenant isolation, the mission lifecycle and its approval gate, the matcher, and assignments — one coherent story: create a mission, match it, propose, accept, approve. <strong>Lighter or mocked where time is short:</strong> crew self-service CRUD (profile, skills, availability). This isn't laziness — it's what "vertical slice over breadth" (the brief's own words) actually means once you commit to it.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Auth</div>
+      <div class="body">
+        <p>One real login endpoint, <code>POST /auth/login</code> (email + password, hashed at rest), issues an opaque bearer token. Both clients hit the exact same endpoint — the CLI's <code>login</code> command and the SPA's login form are two front doors on one mechanism, not two auth systems to maintain.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Matcher</div>
+      <div class="body">
+        <p>Two passes per requirement. <strong>Hard filter</strong> — skill at proficiency, no date overlap, no conflicting confirmed assignment — removes anyone who can't do the job. <strong>Weighted score</strong> ranks who's left: proficiency surplus 50%, workload 30%, availability margin 20%, each normalized 0–1. Every eligible candidate comes back, not just a top few — explainability was a stated evaluation criterion, so the reasoning has to be visible, not just the ranking.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Tenant isolation</div>
+      <div class="body">
+        <p>Structural, not just tested: every data-access function takes <code>org_id</code> as a required argument. A query that could span two organisations' data isn't a bug waiting to be caught by a test — it's a function signature that doesn't compile.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Coding constraints</div>
+      <div class="body">
+        <p>Decided up front so the implementing agent isn't guessing mid-task (§8):</p>
+        <p><strong>Synchronous, not async</strong> — plain <code>def</code> route handlers and a synchronous SQLAlchemy session. At this scale (tens of crew, single-digit requests) async buys nothing, and an async SQLite driver is one more thing that can go wrong in a 3–5h build.</p>
+        <p><strong>Type hints everywhere</strong>, checked by the editor as you go — not wired into a separate CI type-check step (<code>mypy</code>/<code>pyright</code>), which would be one more tool to configure without changing what ships.</p>
+        <p><strong><code>ruff</code></strong> for lint and format in one tool, one config file. <strong>No bare <code>except:</code></strong> — every caught exception is handled meaningfully or re-raised, since silently swallowing one is how FR-20's "no stack traces leaked, full detail logged" quietly stops being true.</p>
+        <p><strong>Tests run against a real temporary SQLite database, not mocks</strong> — a fresh DB per test session. Mocking the DB layer would mean the tests prove the mocks behave as expected, not that tenant isolation or the state machine actually hold.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <section>
+    <h2>Design patterns — the few that earn their place</h2>
+    <p>A small, deliberate set. Most classic patterns would be overkill for this size of system, and reaching for them anyway would cut against the brief's own "coherent design over breadth" — so each one below is named for a specific problem it solves here, not for its own sake.</p>
+
+    <div class="decision">
+      <div class="label">Singleton</div>
+      <div class="body">
+        <p>Exactly one legitimate use, and it's not hand-rolled: the SQLAlchemy <code>engine</code> (connection pool) is created once at app startup and reused for the process's lifetime — FastAPI/SQLAlchemy give you this for free as a module-level object, no <code>getInstance()</code> to write.</p>
+        <p>Nowhere else. Specifically <strong>not</strong> the matcher, not a "mission service," not anything holding state across requests — this is multi-tenant, and a stateful singleton service is exactly how org A's data leaks into org B's request. Services are stateless: plain functions taking <code>org_id</code> and a DB session as arguments.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Dependency injection</div>
+      <div class="body">
+        <p>The pattern actually doing the work, via FastAPI's <code>Depends()</code>: the DB session (one per request, closed after), <code>get_current_user</code> (decodes the bearer token), and a role guard — <code>Depends(require_role(Role.DIRECTOR))</code> — that the route declares and FastAPI enforces before the handler body runs. It's what makes FR-3's "endpoint declares its allowed role(s)" a one-line decorator instead of a copy-pasted <code>if</code> in every handler.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Repository</div>
+      <div class="body">
+        <p>One module of query functions per entity, each taking <code>org_id</code> explicitly — <code>mission_repo.get(db, org_id, mission_id)</code>. Plain functions grouped by file, not a generic <code>IRepository&lt;T&gt;</code> interface hierarchy: that abstraction buys nothing with exactly one implementation (SQLite) and no second one planned.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Service layer</div>
+      <div class="body">
+        <p>Domain logic — lifecycle transitions, the matcher, assignment rules — lives in <code>services/</code>, importable and testable without HTTP in the loop. This is the pattern the whole <code>routes → services → models</code> layering already commits to; the other patterns here are really just how that middle layer is built.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Table-driven state machine</div>
+      <div class="body">
+        <p>FR-9's six states and seven transitions become one literal data structure — <code>ALLOWED_TRANSITIONS: dict[Status, set[Status]]</code> — checked in exactly one place. Not a chain of <code>if status == "draft" and action == "submit"</code> scattered across handlers, which is how a transition nobody remembered to guard gets through.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">The matcher's actual shape</div>
+      <div class="body">
+        <p>Before naming the two patterns below individually: together they're a <strong>two-stage retrieval-and-ranking pipeline</strong> — the same architecture behind search engines, ad-matching, and every real recommender system. Cheaply narrow a large pool to a feasible candidate set (<em>retrieval</em>), then run a more expensive scoring function only over survivors (<em>ranking</em>). Mission Control's matcher is exactly this shape, which matters because it's the one piece of this build explicitly singled out for its "sophistication" — recognizing the problem's actual lineage is the point, not just filtering a list and sorting it.</p>
+        <div class="flow" style="margin-top: 14px;">
+          <div class="step"><span class="who">Retrieval</span>Org's crew pool<br><span style="font-weight:400; color: var(--text-3);">e.g. 8</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">filter</span>Skill @ min proficiency<br><span style="font-weight:400; color: var(--text-3);">5 left</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">filter</span>Available for window<br><span style="font-weight:400; color: var(--text-3);">4 left</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">filter</span>No conflicting confirmed<br><span style="font-weight:400; color: var(--text-3);">3 eligible</span></div>
+          <div class="arrow">→</div>
+          <div class="step"><span class="who">Ranking</span>Weighted score 50/30/20<br><span style="font-weight:400; color: var(--text-3);">all 3 returned, ranked</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Pipe and Filter <span style="font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; font-size: 11px;">(retrieval stage)</span></div>
+      <div class="body">
+        <p>FR-13(a)'s three hard constraints — skill at proficiency, available for the window, no conflicting <em>confirmed</em> assignment — are three independent predicates over one candidate, not one big compound condition. Each is its own small function (<code>has_skill_at_proficiency</code>, <code>is_available_for_window</code>, <code>has_no_conflicting_confirmed_assignment</code>), and eligibility is just <code>all(check(crew) for check in HARD_FILTERS)</code>. That makes each constraint unit-testable with a minimal one-crew fixture instead of needing a full scenario to exercise all three at once — and the date-overlap helper underneath the second and third checks is the same function FR-16's double-booking guard reuses, not a second copy of the same logic.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Strategy <span style="font-weight: 500; color: var(--text-3); text-transform: none; letter-spacing: 0; font-size: 11px;">(ranking stage — one narrow use)</span></div>
+      <div class="body">
+        <p>The matcher's scoring, and only that. Each of the three factors — proficiency surplus, workload, availability margin — is its own small pure function; the ranker calls all three and combines them at the fixed weights. That's what makes "a one-line breakdown of which factors contributed" (FR-13c) fall out naturally, since each factor is already computed separately — and each one unit-tests in isolation.</p>
+      </div>
+    </div>
+
+    <div class="decision">
+      <div class="label">Deliberately skipped</div>
+      <div class="body">
+        <p>Each would be defensible in a bigger system; here they'd be surface area nobody asked for — a repository <em>interface</em> plus a DI container (no second datastore is coming), CQRS or event sourcing (nothing here needs a read/write split), a pluggable matcher-strategy registry (there's one matcher, not a family of interchangeable ones).</p>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="wide">
+    <h2>Roles — what each one can and cannot do</h2>
+    <p>Three roles, one user belongs to exactly one org and holds exactly one role in it. Role gating that doesn't depend on a loaded row is a static <code>Depends(require_role(...))</code> at the route (§4); anything that depends on the specific record — "is this <em>your</em> profile," "did <em>you</em> create this mission" — is an identity check inside the service layer, the same shape as the self-approval gate.</p>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>Capability</th><th>Director</th><th>Mission Lead</th><th>Crew Member</th></tr>
+        <tr><td class="mono">Org skill taxonomy</td><td>Creates skills (FR-5)</td><td>—</td><td>—</td></tr>
+        <tr><td class="mono">Mission create / add requirement</td><td>Yes</td><td>Yes (FR-8)</td><td>—</td></tr>
+        <tr><td class="mono">Mission list / view</td><td>Whole org</td><td>Whole org</td><td>Only missions they're proposed/confirmed on (§4)</td></tr>
+        <tr><td class="mono">Run the matcher</td><td>Yes</td><td>Yes (FR-13)</td><td>—</td></tr>
+        <tr><td class="mono">Propose an assignment</td><td>Yes</td><td>Yes (FR-14)</td><td>—</td></tr>
+        <tr><td class="mono">Approve / reject a mission</td><td><strong>Only role that can</strong> — except a mission they personally created (FR-11's identity-based self-approval gate)</td><td>Never — not even their own</td><td>—</td></tr>
+        <tr><td class="mono">Accept / decline an assignment</td><td>—</td><td>—</td><td>Only their own, named assignment (FR-15)</td></tr>
+        <tr><td class="mono">Crew roster (<code>crew list</code>)</td><td>Yes, org-wide</td><td>Yes, org-wide</td><td>Cannot see other crew at all</td></tr>
+        <tr><td class="mono">Crew profile</td><td>View any, org-wide (not edit)</td><td>View any, org-wide (not edit)</td><td>Edit their own only (FR-4)</td></tr>
+        <tr><td class="mono">Skill proficiency</td><td>Can set on a crew member's behalf</td><td>—</td><td>Sets their own (FR-6)</td></tr>
+        <tr><td class="mono">Availability windows</td><td>—</td><td>—</td><td>Add/remove their own only — FR-7 names no "on behalf of" path</td></tr>
+        <tr><td class="mono">SPA screens (FR-21)</td><td>Missions, Crew, Skills</td><td>Missions, Crew, Skills</td><td>My Assignments, My Profile</td></tr>
+      </table>
+    </div>
+    <figcaption>The one rule that matters most: the approval gate is <strong>identity-based, not role-based</strong>. A Director who happens to be the mission's own creator is blocked exactly like anyone else would be — <code>actor.id == mission.created_by</code>, checked regardless of what role the actor holds (§10 Q8).</figcaption>
+  </section>
+
+  <section>
+    <h2>The primary flow end to end</h2>
+    <div class="flow">
+      <div class="step"><span class="who">Lead</span>Create mission + requirements</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Lead</span>Run matcher</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Lead</span>Propose assignment</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Crew</span>Accept</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Lead</span>Submit for approval</div>
+      <div class="arrow">→</div>
+      <div class="step"><span class="who">Director</span>Approve <span style="font-weight:500; color: var(--text-3);">(not the creator)</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Where each client's authority ends</h2>
+    <div class="table-wrap">
+      <table>
+        <tr><th>Client</th><th>Talks to</th><th>Never does</th></tr>
+        <tr><td><span class="lib mono">CLI</span></td><td class="mono">FastAPI, over HTTP</td><td class="mono">Read the SQLite file directly (FR-18)</td></tr>
+        <tr><td><span class="lib mono">Web UI</span></td><td class="mono">Same FastAPI routes, RPC-style typed client</td><td class="mono">Stand in for CLI coverage — it's additional, not authoritative (§10 #19)</td></tr>
+        <tr><td><span class="lib mono">Services</span></td><td class="mono">Models, with <code>org_id</code> required</td><td class="mono">Trust an <code>org_id</code> from client input (FR-1)</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Companion to <code>docs/prd/mission-control.md</code> (the full design document) and the
+    <a href="https://claude.ai/code/artifact/de0b0bf5-d39d-4a2b-8392-1ac4339bd93a">SPA mockups</a>.
+    FR numbers above refer to §6 of the PRD.
+  </footer>
+
+</div>
