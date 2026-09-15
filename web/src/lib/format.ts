@@ -51,3 +51,17 @@ const ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
 export function assignmentStatusLabel(status: string): string {
   return ASSIGNMENT_STATUS_LABELS[status] ?? status;
 }
+
+/** Presentation-layer label for the 1-5 proficiency scale (PRD Q1: the
+ * scale itself is stored as a plain int; labels are display-only). */
+const PROFICIENCY_LABELS: Record<number, string> = {
+  1: "Novice",
+  2: "Beginner",
+  3: "Intermediate",
+  4: "Advanced",
+  5: "Expert",
+};
+
+export function proficiencyLabel(level: number): string {
+  return PROFICIENCY_LABELS[level] ?? `Level ${level}`;
+}
