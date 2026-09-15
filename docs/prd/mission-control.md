@@ -110,10 +110,12 @@ which matters when a mission is questioned after the fact.
   CLI/API state is the source of truth; a crew member checks it, they aren't paged.
 - Multi-role users, org-to-org collaboration, or missions spanning multiple
   organisations.
-- **Hosted** deployment — this runs locally against SQLite; there is no NAS/cloud target
-  for a take-home challenge. Containerized and CI-gated (R-4, Refinement — see §8) is
-  not the same claim as hosted: the images build and run, nothing is actually deployed
-  anywhere persistent.
+- **Public** deployment — a take-home challenge doesn't need one, and this system was
+  never built with internet-facing auth/hardening in mind. A LAN-only demo instance
+  does exist (R-5, Refinement — see §8: Leslie's own Synology NAS, containerized via
+  R-4), reachable only from inside his own network, purely for convenience while
+  testing — it isn't what "easy to run locally" or the evaluation criteria are about,
+  and it isn't part of the submission.
 
 ## 4. Users & use cases
 
@@ -337,6 +339,13 @@ settings, no screens beyond these two — this is a state-management showcase (�
   the API cross-origin needs it or every request 405s on preflight. Safe to leave
   wide-open here: auth is a bearer token in a header, not a cookie, so there's no
   ambient credential a stricter origin allowlist would actually protect.
+- **A LAN-only demo instance runs on Leslie's NAS** (R-5, Refinement) — API on
+  `192.168.1.176:8100`, SPA on `:8101`, both from the images R-4 publishes to GHCR.
+  The SPA's image is tagged separately (`nas`, not `latest`) since `VITE_API_BASE_URL`
+  bakes into its static JS bundle at build time — the URL that's correct for this
+  network isn't the one `:latest`'s local-dev build uses. Not internet-facing, not
+  part of the submission, purely a convenience for testing against something real
+  instead of a local dev server.
 - **Auth is intentionally minimal.** A real `POST /auth/login` (email + password)
   endpoint issues opaque bearer tokens, hashed at rest; passwords hashed too. No
   OAuth/SSO/session-refresh/password-reset/email-verification — see §3 non-goals
@@ -550,6 +559,7 @@ nothing here required new code.
 | R-2 | 2026-09-15 | CORS was never addressed anywhere in the Discovery-stage PRD, since nothing before T8 was a browser client. T8 hit a hard blocker (every API call 405'd on preflight) until it was added. | Added a §8 Constraints bullet documenting CORS is enabled wide-open, with the reasoning (bearer token in a header, not a cookie — no ambient credential a stricter allowlist would protect). | No — same reasoning, just undocumented until now. |
 | R-3 | 2026-09-15 | FR-14 doesn't say whether proposing the same crew member twice on one requirement should be blocked. T6 flagged it rather than silently deciding; today it's allowed, consuming two headcount slots for one person. | Added as a new open question, §10 Q26 — genuinely undecided, not folded into a "correct by default" answer. | No — not material enough to block Finalize; Leslie's call whenever it's convenient, a small guard if the answer is "block it." |
 | R-4 | 2026-09-15 | Post-Refinement request: a CI gate (lint + test on every PR) and Docker images for the API and SPA, published to a registry. Not part of the original Discovery-stage scope — §3/§8 had explicitly framed Docker as optional and deployment as fully out of scope. | Added `.github/workflows/ci.yml` (ruff+pytest, oxlint+tsc+vite build, gating PRs into `main`/`feature/mission-control`) and `.github/workflows/docker-publish.yml` (builds + pushes `Dockerfile`/`web/Dockerfile` to GHCR on push, using the built-in `GITHUB_TOKEN` — no new secrets/accounts). Both images built and run-verified locally before commit. §3 and §8 reworded: containerized/CI-gated is not the same claim as hosted — still no live deployment target. | No — additive tooling, doesn't change any FR; committed directly to `feature/mission-control`, same as R-1/R-2/R-3. |
+| R-5 | 2026-09-15 | Post-Refinement request: actually deploy the running system (not just publish images) — to Leslie's own Synology NAS, per his standing `nas-deploy` workflow. This directly reverses R-4's own "still no live deployment target" line and §3's "there is no NAS/cloud target for a take-home challenge," both written earlier the same day. | Added `docker-compose.yml`/`docker-compose.build.yml`/`.env.example`; stood up on the NAS at `192.168.1.176` — API on `:8100` (SQLite persisted in a named volume, seeded via a one-off `docker compose exec`), SPA on `:8101` as a separate `nas`-tagged image (`VITE_API_BASE_URL` bakes into the static bundle at build time, so it's a distinct image from the `:latest` used for local dev, not a runtime config swap). Verified end to end: `/health` reachable, SPA's bundled JS confirmed pointing at the NAS's own API URL, not `localhost`. §3 reworded again: a **LAN-only, personal, demo instance now exists** — still not a public/cloud target, which is what "no NAS/cloud target" was actually guarding against (the brief's scoring is on the repo + design doc + transcripts, not uptime of a hosted instance). | No — infrastructure only, no FR changed; not part of what gets evaluated, but real enough that the PRD should say it plainly rather than let §3 go stale a second time in one day. |
 
 ## 14. Discovery grilling log
 
