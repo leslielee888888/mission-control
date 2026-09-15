@@ -32,7 +32,6 @@ once, on first start — see that file.)
 
 from __future__ import annotations
 
-import hashlib
 import itertools
 from dataclasses import dataclass
 from datetime import date
@@ -85,22 +84,27 @@ def _reset_database_file() -> None:
         db_path.unlink()
 
 
-def _demo_password(email: str) -> str:
-    """Derive a stable demo password from a user's email.
+#: Every seeded demo user gets this same password. Deliberately static, not
+#: per-user or randomly generated — the seed script runs independently on
+#: every machine (local checkout, CI, the NAS), and a randomly generated
+#: password was different every time, which was a real source of login
+#: confusion (a NAS user's password never matched what a local checkout's
+#: ``seed_credentials.txt`` showed, or the reverse). One fixed password for
+#: every demo user means no lookup is ever needed, on any environment, for
+#: any user — reasonable for pure demo/test data (§8's threat model doesn't
+#: cover it) where interchangeability matters more than per-user secrecy.
+DEMO_PASSWORD = "MissionControl2026!"
 
-    Deliberately a deterministic function of the email, not
-    ``secrets.token_urlsafe`` — the seed script runs independently on every
-    machine (local checkout, CI, the NAS), and a randomly generated password
-    is different every time, which was a real source of login confusion (the
-    NAS's password for a user never matched the one in a local checkout's
-    ``seed_credentials.txt``, or the reverse). Deriving it from the email
-    instead means the same demo user has the same password everywhere, while
-    still being unique per user and unguessable without the seed file. Not a
-    real credential (this is demo data, §8's threat model doesn't cover it)
-    so a keyed hash rather than a proper KDF is fine here.
+
+def _demo_password(email: str) -> str:
+    """Return the shared demo password (see ``DEMO_PASSWORD``).
+
+    Still takes ``email`` — kept as the extension point if a future need
+    (e.g. per-user secrecy again) brings back a derived password; every
+    call site already passes the email so that wouldn't ripple out.
     """
-    digest = hashlib.sha256(f"mission-control-demo:{email}".encode()).hexdigest()
-    return f"Demo-{digest[:12]}"
+    del email  # unused: every demo user shares DEMO_PASSWORD
+    return DEMO_PASSWORD
 
 
 def _new_user(
@@ -112,9 +116,9 @@ def _new_user(
     email: str,
     credentials: list[SeededCredential],
 ) -> User:
-    """Create one login with a demo password derived from the user's email
-    (see ``_demo_password``), recording it in ``credentials`` for the
-    end-of-run report (§10 #24 — real, usable passwords, not blank ones)."""
+    """Create one login with the shared demo password (see
+    ``DEMO_PASSWORD``), recording it in ``credentials`` for the end-of-run
+    report (§10 #24 — real, usable passwords, not blank ones)."""
     assert org.id is not None
     password = _demo_password(email)
     user = User(
