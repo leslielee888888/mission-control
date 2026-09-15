@@ -710,6 +710,30 @@
 
   </section>
 
+  <section class="wide">
+    <h2>Roles — what each one can and cannot do</h2>
+    <p>Three roles, one user belongs to exactly one org and holds exactly one role in it. Role gating that doesn't depend on a loaded row is a static <code>Depends(require_role(...))</code> at the route (§4); anything that depends on the specific record — "is this <em>your</em> profile," "did <em>you</em> create this mission" — is an identity check inside the service layer, the same shape as the self-approval gate.</p>
+
+    <div class="table-wrap">
+      <table>
+        <tr><th>Capability</th><th>Director</th><th>Mission Lead</th><th>Crew Member</th></tr>
+        <tr><td class="mono">Org skill taxonomy</td><td>Creates skills (FR-5)</td><td>—</td><td>—</td></tr>
+        <tr><td class="mono">Mission create / add requirement</td><td>Yes</td><td>Yes (FR-8)</td><td>—</td></tr>
+        <tr><td class="mono">Mission list / view</td><td>Whole org</td><td>Whole org</td><td>Only missions they're proposed/confirmed on (§4)</td></tr>
+        <tr><td class="mono">Run the matcher</td><td>Yes</td><td>Yes (FR-13)</td><td>—</td></tr>
+        <tr><td class="mono">Propose an assignment</td><td>Yes</td><td>Yes (FR-14)</td><td>—</td></tr>
+        <tr><td class="mono">Approve / reject a mission</td><td><strong>Only role that can</strong> — except a mission they personally created (FR-11's identity-based self-approval gate)</td><td>Never — not even their own</td><td>—</td></tr>
+        <tr><td class="mono">Accept / decline an assignment</td><td>—</td><td>—</td><td>Only their own, named assignment (FR-15)</td></tr>
+        <tr><td class="mono">Crew roster (<code>crew list</code>)</td><td>Yes, org-wide</td><td>Yes, org-wide</td><td>Cannot see other crew at all</td></tr>
+        <tr><td class="mono">Crew profile</td><td>View any, org-wide (not edit)</td><td>View any, org-wide (not edit)</td><td>Edit their own only (FR-4)</td></tr>
+        <tr><td class="mono">Skill proficiency</td><td>Can set on a crew member's behalf</td><td>—</td><td>Sets their own (FR-6)</td></tr>
+        <tr><td class="mono">Availability windows</td><td>—</td><td>—</td><td>Add/remove their own only — FR-7 names no "on behalf of" path</td></tr>
+        <tr><td class="mono">SPA screens (FR-21)</td><td>Missions, Crew, Skills</td><td>Missions, Crew, Skills</td><td>My Assignments, My Profile</td></tr>
+      </table>
+    </div>
+    <figcaption>The one rule that matters most: the approval gate is <strong>identity-based, not role-based</strong>. A Director who happens to be the mission's own creator is blocked exactly like anyone else would be — <code>actor.id == mission.created_by</code>, checked regardless of what role the actor holds (§10 Q8).</figcaption>
+  </section>
+
   <section>
     <h2>The primary flow end to end</h2>
     <div class="flow">
