@@ -1,0 +1,5 @@
+# Shell scripts run *inside* the Linux container (see docker/entrypoint.sh)
+# must keep LF line endings on checkout regardless of a contributor's local
+# core.autocrlf -- CRLF breaks the shebang at container runtime. Same
+# Windows-checkout pitfall class as the plain-ASCII note in requirements.txt.
+*.sh text eol=lf
