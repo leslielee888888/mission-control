@@ -30,7 +30,13 @@ function MissionRowSkeleton() {
   );
 }
 
-export function MissionListScreen({ onSelectMission }: { onSelectMission: (missionId: number) => void }) {
+export function MissionListScreen({
+  onSelectMission,
+  onCreateMission,
+}: {
+  onSelectMission: (missionId: number) => void;
+  onCreateMission: () => void;
+}) {
   const missionsQuery = useQuery({ queryKey: ["missions"], queryFn: api.mission.list });
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<MissionStatus | "all">("all");
@@ -53,11 +59,23 @@ export function MissionListScreen({ onSelectMission }: { onSelectMission: (missi
 
   return (
     <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-10 py-8">
-      <div>
-        <div className="text-[22px] font-bold">Missions</div>
-        <div className="mt-0.5 text-[13px] text-text-2">
-          {missionsQuery.isSuccess ? `${missions.length} mission${missions.length === 1 ? "" : "s"} in your organization` : " "}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-[22px] font-bold">Missions</div>
+          <div className="mt-0.5 text-[13px] text-text-2">
+            {missionsQuery.isSuccess ? `${missions.length} mission${missions.length === 1 ? "" : "s"} in your organization` : " "}
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={onCreateMission}
+          className="flex flex-none items-center gap-1.5 rounded-md bg-accent px-4 py-2.5 text-[13px] font-semibold text-white"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          New mission
+        </button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">

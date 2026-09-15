@@ -128,6 +128,15 @@ export const api = {
   mission: {
     list: (): Promise<Mission[]> => get<Mission[]>("/missions"),
     get: (id: number): Promise<MissionDetail> => get<MissionDetail>(`/missions/${id}`),
+    /** Director or Mission Lead (api/routes/mission.py's `require_role`);
+     * starts in `draft` (FR-8). `startDate`/`endDate` are `YYYY-MM-DD`. */
+    create: (input: { name: string; description: string; startDate: string; endDate: string }): Promise<Mission> =>
+      post<Mission>("/missions", {
+        name: input.name,
+        description: input.description,
+        start_date: input.startDate,
+        end_date: input.endDate,
+      }),
     approve: (id: number): Promise<Mission> => post<Mission>(`/missions/${id}/approve`),
     reject: (id: number, reason: string): Promise<Mission> =>
       post<Mission>(`/missions/${id}/reject`, { reason }),

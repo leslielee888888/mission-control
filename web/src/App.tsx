@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "./auth/AuthContext";
 import { LoginScreen } from "./screens/LoginScreen";
 import { MissionListScreen } from "./screens/MissionListScreen";
+import { MissionCreateScreen } from "./screens/MissionCreateScreen";
 import { MissionDetailScreen } from "./screens/MissionDetailScreen";
 import { MyAssignmentsScreen } from "./screens/MyAssignmentsScreen";
 import { CrewListScreen } from "./screens/CrewListScreen";
@@ -34,23 +35,36 @@ const DIRECTOR_LEAD_NAV: NavItem[] = [
 function DirectorLeadApp() {
   const [section, setSection] = useState<DirectorLeadSection>("missions");
   const [selectedMissionId, setSelectedMissionId] = useState<number | null>(null);
+  const [isCreatingMission, setIsCreatingMission] = useState(false);
   const [selectedCrewId, setSelectedCrewId] = useState<number | null>(null);
 
   function selectSection(key: string) {
     setSection(key as DirectorLeadSection);
     // Leaving a section resets its drill-down so coming back starts at the list.
     setSelectedMissionId(null);
+    setIsCreatingMission(false);
     setSelectedCrewId(null);
   }
 
   let content;
   if (section === "missions") {
-    content =
-      selectedMissionId === null ? (
-        <MissionListScreen onSelectMission={setSelectedMissionId} />
-      ) : (
-        <MissionDetailScreen missionId={selectedMissionId} onBack={() => setSelectedMissionId(null)} />
+    if (isCreatingMission) {
+      content = (
+        <MissionCreateScreen
+          onCreated={(missionId) => {
+            setIsCreatingMission(false);
+            setSelectedMissionId(missionId);
+          }}
+          onCancel={() => setIsCreatingMission(false)}
+        />
       );
+    } else if (selectedMissionId === null) {
+      content = (
+        <MissionListScreen onSelectMission={setSelectedMissionId} onCreateMission={() => setIsCreatingMission(true)} />
+      );
+    } else {
+      content = <MissionDetailScreen missionId={selectedMissionId} onBack={() => setSelectedMissionId(null)} />;
+    }
   } else if (section === "crew") {
     content =
       selectedCrewId === null ? (
