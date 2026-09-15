@@ -1,9 +1,17 @@
-"""Demo seed data (T9, FR-19).
+"""Demo seed data (T9, FR-19; scaled up T11).
 
-Builds two tenant organisations end to end — each with a Director, two
-Mission Leads, a varied crew roster, its own skill taxonomy, and missions
-spanning several points in the FR-9 lifecycle — so the API/CLI/matcher can be
-exercised immediately after a fresh checkout with no manual setup.
+Builds two tenant organisations end to end so the API/CLI/matcher can be
+exercised immediately after a fresh checkout with no manual setup:
+
+* **Northwind Disaster Response** — scaled way up (T11): 50 crew members, a
+  Director + 3 Mission Leads, the original 6-skill taxonomy, and 10 missions
+  spread across all 6 FR-9 lifecycle states with real confirmed assignments
+  behind the active/completed ones.
+* **Beacon Relief Network** — left at T9's original, smaller scale (Director
+  + 2 Mission Leads, 6 crew, 3 missions) on purpose: a 50-crew org next to a
+  ~6-crew org is a more convincing demonstration that tenant isolation (FR-1)
+  holds regardless of org size than two similarly-sized orgs would be. FR-19
+  only requires >=2 orgs; this keeps that contrast rather than scaling both.
 
 Goes straight through the ``services`` layer (not HTTP), the same domain
 functions ``api/routes`` call, rather than duplicating their rules (skill
@@ -17,11 +25,14 @@ Run with ``python -m scripts.seed`` (see README.md). Re-running starts from a
 truly empty database: the default SQLite file is deleted first (documented in
 README), so this is "fresh file per run," not incremental/idempotent upsert —
 sufficient per FR-19 and simpler than reconciling unique-constraint collisions
-on every rerun.
+on every rerun. (The Docker entrypoint, ``docker/entrypoint.sh``, guards the
+*container's* db file against that reset by only ever running this script
+once, on first start — see that file.)
 """
 
 from __future__ import annotations
 
+import itertools
 import secrets
 from dataclasses import dataclass
 from datetime import date
@@ -136,7 +147,265 @@ def _build_crew_member(
     return crew
 
 
-# --- Org A: Northwind Disaster Response -------------------------------------
+def _confirm_assignment(
+    session: Session,
+    org_id: int,
+    proposer: User,
+    *,
+    mission_id: int,
+    requirement_id: int,
+    crew: User,
+) -> None:
+    """Propose then immediately accept — every confirmed demo assignment
+    goes through the real ``services.assignment`` propose/accept pair (T6),
+    never a direct row insert, so workload scoring (FR-13b) has genuine
+    ``confirmed`` rows behind it."""
+    assert crew.id is not None
+    proposal = propose_assignment(
+        session,
+        org_id,
+        proposer,
+        mission_id=mission_id,
+        requirement_id=requirement_id,
+        crew_id=crew.id,
+    )
+    assert proposal.assignment.id is not None
+    respond_to_assignment(session, org_id, crew, proposal.assignment.id, "accept")
+
+
+# --- Org A: Northwind Disaster Response --------------------------------------
+#
+# T11 scale: 50 crew, a Director + 3 Mission Leads, the original 6-skill
+# taxonomy (still plenty of variety at this headcount), and 10 missions
+# spread across all 6 FR-9 lifecycle states.
+#
+# Crew are built in two groups:
+#
+# * A ~10-person "storyline" roster (explicit, named, commented) that carries
+#   every specific demo purpose below — the matcher's proficiency and
+#   availability hard filters (FR-13a), and the crew actually proposed and
+#   confirmed onto the active/completed missions.
+# * A ~40-person "filler" roster, generated from two small name-part lists so
+#   the org reads as genuinely 50-strong without 40 more hand-typed literals.
+#   Skills/proficiencies cycle deterministically by index (not random) so a
+#   rerun is reproducible byte-for-byte; a spaced-out slice of them also gets
+#   an availability window, so the ~15-20% minority the matcher's hard filter
+#   has real exclusions to show isn't limited to the two storyline examples.
+
+NORTHWIND_SKILL_TAXONOMY = [
+    ("Wilderness First Aid", "medical"),
+    ("Swift-Water Rescue", "rescue"),
+    ("Chainsaw Operation", "rescue"),
+    ("Incident Command", "leadership"),
+    ("Drone Piloting", "recon"),
+    ("Logistics Coordination", "logistics"),
+]
+
+#: Every mission's (start, end) date, keyed by the short name used below for
+#: both mission creation and (for the still-open missions) the pool of
+#: windows handed to a slice of the filler crew's unavailability — one
+#: source of truth instead of the same literal dates typed twice.
+NORTHWIND_MISSION_WINDOWS: dict[str, tuple[date, date]] = {
+    # Past-dated: already wrapped up before "today" (2026-09-15).
+    "summer_wildfire": (date(2026, 8, 1), date(2026, 8, 10)),
+    "debris": (date(2026, 8, 20), date(2026, 8, 25)),
+    # Spanning "today": in progress right now.
+    "coastal": (date(2026, 9, 10), date(2026, 9, 20)),
+    "avalanche": (date(2026, 9, 12), date(2026, 9, 22)),
+    # Future-dated: still being planned/approved, or called off before they
+    # got there.
+    "evacuation": (date(2026, 9, 25), date(2026, 10, 2)),
+    "flood": (date(2026, 10, 5), date(2026, 10, 12)),
+    "ridgeline": (date(2026, 10, 8), date(2026, 10, 14)),
+    "wildfire": (date(2026, 10, 20), date(2026, 10, 28)),
+    "rockslide": (date(2026, 11, 2), date(2026, 11, 6)),
+    "blackout": (date(2026, 11, 10), date(2026, 11, 16)),
+}
+
+#: The still-open (non-active, non-completed) missions' windows, cycled
+#: across the filler crew who get an availability window — so the matcher's
+#: availability hard filter has exclusions to show on more than just the two
+#: storyline examples (Jordan, Taylor) below.
+_FILLER_WINDOW_POOL = [
+    NORTHWIND_MISSION_WINDOWS[key]
+    for key in ("flood", "ridgeline", "wildfire", "rockslide", "blackout", "evacuation")
+]
+
+_FILLER_FIRST_NAMES = [
+    "Harper",
+    "Rowan",
+    "Skyler",
+    "Emerson",
+    "Dakota",
+    "Finley",
+    "Reese",
+    "Marlowe",
+]
+_FILLER_LAST_NAMES = ["Whitaker", "Delgado", "Kowalski", "Iverson", "Mbeki"]
+
+
+def _build_northwind_storyline_crew(
+    session: Session, org: Organization, credentials: list[SeededCredential]
+) -> dict[str, User]:
+    """The ~10 named crew every demo below reads by key — carried over from
+    T9 where it still applies, extended for T11's larger active/completed
+    missions."""
+    return {
+        "sam": _build_crew_member(
+            session,
+            org=org,
+            name="Sam Rivera",
+            email="sam.rivera@northwind.demo",
+            skills={"Wilderness First Aid": 5, "Swift-Water Rescue": 3, "Incident Command": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        # Meets Highland Wildfire Support's proficiency bar (Wilderness First
+        # Aid >= 3) but is unavailable across its exact dates -- demonstrates
+        # the matcher's availability hard-filter excluding an otherwise-
+        # qualified candidate (FR-13a). Separately, also the crew member
+        # confirmed onto Coastal Storm Recovery's Incident Command slot --
+        # two independent demo purposes on one person, same as T9.
+        "jordan": _build_crew_member(
+            session,
+            org=org,
+            name="Jordan Blake",
+            email="jordan.blake@northwind.demo",
+            skills={"Wilderness First Aid": 3, "Incident Command": 4, "Drone Piloting": 5},
+            unavailability=[(date(2026, 10, 22), date(2026, 10, 25))],
+            credentials=credentials,
+        ),
+        "casey": _build_crew_member(
+            session,
+            org=org,
+            name="Casey Nguyen",
+            email="casey.nguyen@northwind.demo",
+            skills={"Swift-Water Rescue": 5, "Wilderness First Aid": 4, "Chainsaw Operation": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        # Chainsaw Operation and Logistics Coordination both meet real
+        # requirement bars this time (Summer Wildfire Containment, Metro
+        # Blackout Support) -- the Nov 15-30 window now genuinely overlaps
+        # Metro Blackout Support's Nov 10-16 dates, so Taylor shows up
+        # skill-eligible for that requirement yet excluded by availability
+        # (FR-13a), the same shape as Jordan's demo above.
+        "taylor": _build_crew_member(
+            session,
+            org=org,
+            name="Taylor Morgan",
+            email="taylor.morgan@northwind.demo",
+            skills={"Chainsaw Operation": 5, "Logistics Coordination": 3},
+            unavailability=[(date(2026, 11, 15), date(2026, 11, 30))],
+            credentials=credentials,
+        ),
+        "riley": _build_crew_member(
+            session,
+            org=org,
+            name="Riley Ortiz",
+            email="riley.ortiz@northwind.demo",
+            skills={"Incident Command": 3, "Drone Piloting": 2, "Wilderness First Aid": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        "avery": _build_crew_member(
+            session,
+            org=org,
+            name="Avery Kim",
+            email="avery.kim@northwind.demo",
+            skills={"Logistics Coordination": 5, "Swift-Water Rescue": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        # Below every requirement's minimum proficiency it could apply to
+        # across all 10 missions (every Wilderness First Aid bar is >= 2,
+        # every Chainsaw Operation bar is >= 2) -- demonstrates the
+        # matcher's proficiency hard-filter excluding a crew member who
+        # holds the skill but not at the bar (FR-13a).
+        "jamie": _build_crew_member(
+            session,
+            org=org,
+            name="Jamie Fox",
+            email="jamie.fox@northwind.demo",
+            skills={"Wilderness First Aid": 1, "Chainsaw Operation": 1},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        # Confirmed onto Mountain Pass Avalanche Response's second
+        # Wilderness First Aid slot, alongside Sam.
+        "quinn": _build_crew_member(
+            session,
+            org=org,
+            name="Quinn Ellis",
+            email="quinn.ellis@northwind.demo",
+            skills={"Wilderness First Aid": 4, "Drone Piloting": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        # Confirmed onto Late-Summer Debris Clearance's Chainsaw Operation
+        # requirement, alongside Elliot.
+        "nadia": _build_crew_member(
+            session,
+            org=org,
+            name="Nadia Osei",
+            email="nadia.osei@northwind.demo",
+            skills={"Chainsaw Operation": 3, "Incident Command": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+        "elliot": _build_crew_member(
+            session,
+            org=org,
+            name="Elliot Park",
+            email="elliot.park@northwind.demo",
+            skills={"Chainsaw Operation": 4, "Logistics Coordination": 2},
+            unavailability=[],
+            credentials=credentials,
+        ),
+    }
+
+
+def _build_northwind_filler_crew(
+    session: Session, org: Organization, credentials: list[SeededCredential]
+) -> int:
+    """40 more crew members generated from two short name-part lists (8 x 5
+    = 40 unique pairs, deterministic order via ``itertools.product`` -- no
+    two collide, and nothing here depends on a random seed).
+
+    Skills and proficiencies cycle by index so every person's mix is
+    genuinely different from their neighbours' without needing 40 more
+    hand-typed literals; a spaced-out slice (every 6th) also gets an
+    unavailability window pulled from ``_FILLER_WINDOW_POOL`` so the
+    minority-with-a-window (~15-20% of the full 50, combined with Jordan and
+    Taylor above) isn't only the two storyline examples.
+
+    Returns the count built, for the run-summary print.
+    """
+    skill_names = [name for name, _category in NORTHWIND_SKILL_TAXONOMY]
+    name_pairs = list(itertools.product(_FILLER_FIRST_NAMES, _FILLER_LAST_NAMES))
+    assert len(name_pairs) == 40
+
+    for index, (first, last) in enumerate(name_pairs):
+        skill_count = 1 + (index % 3)  # 1, 2, or 3 skills -- cycles every 3 people
+        start = index % len(skill_names)
+        chosen = [skill_names[(start + offset) % len(skill_names)] for offset in range(skill_count)]
+        skills = {name: 1 + ((index * 2 + offset * 3) % 5) for offset, name in enumerate(chosen)}
+
+        unavailability: list[tuple[date, date]] = []
+        if index % 6 == 0:
+            pool_index = (index // 6) % len(_FILLER_WINDOW_POOL)
+            unavailability = [_FILLER_WINDOW_POOL[pool_index]]
+
+        _build_crew_member(
+            session,
+            org=org,
+            name=f"{first} {last}",
+            email=f"{first.lower()}.{last.lower()}@northwind.demo",
+            skills=skills,
+            unavailability=unavailability,
+            credentials=credentials,
+        )
+    return len(name_pairs)
 
 
 def _seed_northwind(session: Session, credentials: list[SeededCredential]) -> None:
@@ -169,103 +438,36 @@ def _seed_northwind(session: Session, credentials: list[SeededCredential]) -> No
         email="lead.priya@northwind.demo",
         credentials=credentials,
     )
-
-    _build_skill_taxonomy(
+    # A 3rd Mission Lead -- at 50 crew and 10 concurrent-ish missions, two
+    # leads carrying every mission reads thin; a third spreads ownership the
+    # way an org actually this size would.
+    devon = _new_user(
         session,
-        org,
-        [
-            ("Wilderness First Aid", "medical"),
-            ("Swift-Water Rescue", "rescue"),
-            ("Chainsaw Operation", "rescue"),
-            ("Incident Command", "leadership"),
-            ("Drone Piloting", "recon"),
-            ("Logistics Coordination", "logistics"),
-        ],
+        org=org,
+        role=Role.MISSION_LEAD,
+        name="Devon Okafor",
+        email="lead.devon@northwind.demo",
+        credentials=credentials,
     )
 
-    crew = {
-        "sam": _build_crew_member(
-            session,
-            org=org,
-            name="Sam Rivera",
-            email="sam.rivera@northwind.demo",
-            skills={"Wilderness First Aid": 5, "Swift-Water Rescue": 3, "Incident Command": 2},
-            unavailability=[],
-            credentials=credentials,
-        ),
-        # Meets Highland Wildfire Support's proficiency bar but is unavailable
-        # across its exact dates -- demonstrates the matcher's availability
-        # hard-filter excluding an otherwise-qualified candidate (FR-13a).
-        "jordan": _build_crew_member(
-            session,
-            org=org,
-            name="Jordan Blake",
-            email="jordan.blake@northwind.demo",
-            skills={"Wilderness First Aid": 3, "Incident Command": 4, "Drone Piloting": 5},
-            unavailability=[(date(2026, 10, 22), date(2026, 10, 25))],
-            credentials=credentials,
-        ),
-        "casey": _build_crew_member(
-            session,
-            org=org,
-            name="Casey Nguyen",
-            email="casey.nguyen@northwind.demo",
-            skills={"Swift-Water Rescue": 5, "Wilderness First Aid": 4, "Chainsaw Operation": 2},
-            unavailability=[],
-            credentials=credentials,
-        ),
-        "taylor": _build_crew_member(
-            session,
-            org=org,
-            name="Taylor Morgan",
-            email="taylor.morgan@northwind.demo",
-            skills={"Chainsaw Operation": 5, "Logistics Coordination": 3},
-            unavailability=[(date(2026, 11, 15), date(2026, 11, 30))],
-            credentials=credentials,
-        ),
-        "riley": _build_crew_member(
-            session,
-            org=org,
-            name="Riley Ortiz",
-            email="riley.ortiz@northwind.demo",
-            skills={"Incident Command": 3, "Drone Piloting": 2, "Wilderness First Aid": 2},
-            unavailability=[],
-            credentials=credentials,
-        ),
-        "avery": _build_crew_member(
-            session,
-            org=org,
-            name="Avery Kim",
-            email="avery.kim@northwind.demo",
-            skills={"Logistics Coordination": 5, "Swift-Water Rescue": 2},
-            unavailability=[],
-            credentials=credentials,
-        ),
-        # Below every requirement's minimum proficiency it could apply to --
-        # demonstrates the matcher's proficiency hard-filter excluding a
-        # crew member who holds the skill but not at the bar (FR-13a).
-        "jamie": _build_crew_member(
-            session,
-            org=org,
-            name="Jamie Fox",
-            email="jamie.fox@northwind.demo",
-            skills={"Wilderness First Aid": 1, "Chainsaw Operation": 2},
-            unavailability=[],
-            credentials=credentials,
-        ),
-    }
+    _build_skill_taxonomy(session, org, NORTHWIND_SKILL_TAXONOMY)
+
+    crew = _build_northwind_storyline_crew(session, org, credentials)
+    filler_count = _build_northwind_filler_crew(session, org, credentials)
+    assert len(crew) + filler_count == 50
 
     skills_by_name = {skill.name: skill for skill in list_skills(session, org.id)}
+    windows = NORTHWIND_MISSION_WINDOWS
 
-    # Mission 1: draft -- a requirement attached, never submitted.
+    # --- Mission 1: draft -- a requirement attached, never submitted. ------
     flood = create_mission(
         session,
         org.id,
         marcus,
         name="Riverside Flood Response",
         description="Swift-water rescue support for rising river levels near the county line.",
-        start_date=date(2026, 10, 5),
-        end_date=date(2026, 10, 12),
+        start_date=windows["flood"][0],
+        end_date=windows["flood"][1],
     )
     assert flood.id is not None
     add_requirement(
@@ -277,15 +479,43 @@ def _seed_northwind(session: Session, credentials: list[SeededCredential]) -> No
         headcount=2,
     )
 
-    # Mission 2: pending_approval -- submitted, awaiting the Director.
+    # --- Mission 2: draft -- a second draft, different skill mix. ----------
+    ridgeline = create_mission(
+        session,
+        org.id,
+        devon,
+        name="Ridgeline Search and Rescue",
+        description="Locate and recover hikers stranded above the tree line after an early storm.",
+        start_date=windows["ridgeline"][0],
+        end_date=windows["ridgeline"][1],
+    )
+    assert ridgeline.id is not None
+    add_requirement(
+        session,
+        org.id,
+        ridgeline.id,
+        skill_id=_skill_id(skills_by_name, "Wilderness First Aid"),
+        min_proficiency=2,
+        headcount=1,
+    )
+    add_requirement(
+        session,
+        org.id,
+        ridgeline.id,
+        skill_id=_skill_id(skills_by_name, "Drone Piloting"),
+        min_proficiency=3,
+        headcount=1,
+    )
+
+    # --- Mission 3: pending_approval -- submitted, awaiting the Director. --
     wildfire = create_mission(
         session,
         org.id,
         priya,
         name="Highland Wildfire Support",
         description="Evacuation and containment support for the Highland Ridge wildfire.",
-        start_date=date(2026, 10, 20),
-        end_date=date(2026, 10, 28),
+        start_date=windows["wildfire"][0],
+        end_date=windows["wildfire"][1],
     )
     assert wildfire.id is not None
     add_requirement(
@@ -306,16 +536,77 @@ def _seed_northwind(session: Session, credentials: list[SeededCredential]) -> No
     )
     execute_mission_transition(session, org.id, wildfire.id, priya, "submit")
 
-    # Mission 3: active, one requirement filled and one deliberately left
-    # short-staffed -- FR-17 ("under-staffing doesn't block activation").
+    # --- Mission 4: approved -- through the gate, not yet activated. -------
+    rockslide = create_mission(
+        session,
+        org.id,
+        marcus,
+        name="Canyon Rockslide Response",
+        description="Clear a rockslide blocking the only access road into Canyon Pines.",
+        start_date=windows["rockslide"][0],
+        end_date=windows["rockslide"][1],
+    )
+    assert rockslide.id is not None
+    add_requirement(
+        session,
+        org.id,
+        rockslide.id,
+        skill_id=_skill_id(skills_by_name, "Chainsaw Operation"),
+        min_proficiency=2,
+        headcount=1,
+    )
+    add_requirement(
+        session,
+        org.id,
+        rockslide.id,
+        skill_id=_skill_id(skills_by_name, "Incident Command"),
+        min_proficiency=2,
+        headcount=1,
+    )
+    execute_mission_transition(session, org.id, rockslide.id, marcus, "submit")
+    execute_mission_transition(session, org.id, rockslide.id, director, "approve")
+
+    # --- Mission 5: approved -- a second one, different skill mix. ---------
+    blackout = create_mission(
+        session,
+        org.id,
+        priya,
+        name="Metro Blackout Support",
+        description="Logistics and aerial assessment support during the multi-day metro blackout.",
+        start_date=windows["blackout"][0],
+        end_date=windows["blackout"][1],
+    )
+    assert blackout.id is not None
+    add_requirement(
+        session,
+        org.id,
+        blackout.id,
+        skill_id=_skill_id(skills_by_name, "Logistics Coordination"),
+        min_proficiency=3,
+        headcount=2,
+    )
+    add_requirement(
+        session,
+        org.id,
+        blackout.id,
+        skill_id=_skill_id(skills_by_name, "Drone Piloting"),
+        min_proficiency=2,
+        headcount=1,
+    )
+    execute_mission_transition(session, org.id, blackout.id, priya, "submit")
+    execute_mission_transition(session, org.id, blackout.id, director, "approve")
+
+    # --- Mission 6: active, deliberately short-staffed on one requirement --
+    # -- FR-17 ("under-staffing doesn't block activation"), same shape T9
+    # demonstrated on Coastal Storm Recovery.
     coastal = create_mission(
         session,
         org.id,
         marcus,
         name="Coastal Storm Recovery",
         description="Debris clearance and incident command for the coastal storm aftermath.",
-        start_date=date(2026, 11, 1),
-        end_date=date(2026, 11, 10),
+        start_date=windows["coastal"][0],
+        end_date=windows["coastal"][1],
     )
     assert coastal.id is not None
     ic_requirement = add_requirement(
@@ -337,22 +628,205 @@ def _seed_northwind(session: Session, credentials: list[SeededCredential]) -> No
     execute_mission_transition(session, org.id, coastal.id, marcus, "submit")
     execute_mission_transition(session, org.id, coastal.id, director, "approve")
     execute_mission_transition(session, org.id, coastal.id, marcus, "activate")
-    assert crew["jordan"].id is not None
     assert ic_requirement.requirement.id is not None
-    proposal = propose_assignment(
+    _confirm_assignment(
         session,
         org.id,
         marcus,
         mission_id=coastal.id,
         requirement_id=ic_requirement.requirement.id,
-        crew_id=crew["jordan"].id,
+        crew=crew["jordan"],
     )
-    assert proposal.assignment.id is not None
-    respond_to_assignment(session, org.id, crew["jordan"], proposal.assignment.id, "accept")
     # Logistics Coordination is left unfilled on purpose (see above).
+
+    # --- Mission 7: active, fully staffed -- workload scoring (FR-13b) has
+    # real confirmed assignments behind it, not just Mission 6's one.
+    avalanche = create_mission(
+        session,
+        org.id,
+        priya,
+        name="Mountain Pass Avalanche Response",
+        description="Search, medical, and swift-water support after the mountain pass avalanche.",
+        start_date=windows["avalanche"][0],
+        end_date=windows["avalanche"][1],
+    )
+    assert avalanche.id is not None
+    wfa_requirement = add_requirement(
+        session,
+        org.id,
+        avalanche.id,
+        skill_id=_skill_id(skills_by_name, "Wilderness First Aid"),
+        min_proficiency=3,
+        headcount=2,
+    )
+    swr_requirement = add_requirement(
+        session,
+        org.id,
+        avalanche.id,
+        skill_id=_skill_id(skills_by_name, "Swift-Water Rescue"),
+        min_proficiency=2,
+        headcount=1,
+    )
+    execute_mission_transition(session, org.id, avalanche.id, priya, "submit")
+    execute_mission_transition(session, org.id, avalanche.id, director, "approve")
+    execute_mission_transition(session, org.id, avalanche.id, priya, "activate")
+    assert wfa_requirement.requirement.id is not None
+    assert swr_requirement.requirement.id is not None
+    _confirm_assignment(
+        session,
+        org.id,
+        priya,
+        mission_id=avalanche.id,
+        requirement_id=wfa_requirement.requirement.id,
+        crew=crew["sam"],
+    )
+    _confirm_assignment(
+        session,
+        org.id,
+        priya,
+        mission_id=avalanche.id,
+        requirement_id=wfa_requirement.requirement.id,
+        crew=crew["quinn"],
+    )
+    _confirm_assignment(
+        session,
+        org.id,
+        priya,
+        mission_id=avalanche.id,
+        requirement_id=swr_requirement.requirement.id,
+        crew=crew["casey"],
+    )
+
+    # --- Mission 8: completed -- the full happy-path lifecycle, fully
+    # staffed, dated before "today" so it genuinely reads as wrapped up.
+    summer_wildfire = create_mission(
+        session,
+        org.id,
+        marcus,
+        name="Summer Wildfire Containment",
+        description="Containment line support and incident command for the early-season wildfire.",
+        start_date=windows["summer_wildfire"][0],
+        end_date=windows["summer_wildfire"][1],
+    )
+    assert summer_wildfire.id is not None
+    swf_ic_requirement = add_requirement(
+        session,
+        org.id,
+        summer_wildfire.id,
+        skill_id=_skill_id(skills_by_name, "Incident Command"),
+        min_proficiency=3,
+        headcount=1,
+    )
+    swf_chainsaw_requirement = add_requirement(
+        session,
+        org.id,
+        summer_wildfire.id,
+        skill_id=_skill_id(skills_by_name, "Chainsaw Operation"),
+        min_proficiency=3,
+        headcount=1,
+    )
+    execute_mission_transition(session, org.id, summer_wildfire.id, marcus, "submit")
+    execute_mission_transition(session, org.id, summer_wildfire.id, director, "approve")
+    execute_mission_transition(session, org.id, summer_wildfire.id, marcus, "activate")
+    assert swf_ic_requirement.requirement.id is not None
+    assert swf_chainsaw_requirement.requirement.id is not None
+    _confirm_assignment(
+        session,
+        org.id,
+        marcus,
+        mission_id=summer_wildfire.id,
+        requirement_id=swf_ic_requirement.requirement.id,
+        crew=crew["riley"],
+    )
+    _confirm_assignment(
+        session,
+        org.id,
+        marcus,
+        mission_id=summer_wildfire.id,
+        requirement_id=swf_chainsaw_requirement.requirement.id,
+        crew=crew["taylor"],
+    )
+    execute_mission_transition(session, org.id, summer_wildfire.id, marcus, "complete")
+
+    # --- Mission 9: completed -- a second one, single two-headcount
+    # requirement (variety in requirement shape, not just skill/threshold).
+    debris = create_mission(
+        session,
+        org.id,
+        priya,
+        name="Late-Summer Debris Clearance",
+        description="Clear fallen timber from the regional access roads before the fall season.",
+        start_date=windows["debris"][0],
+        end_date=windows["debris"][1],
+    )
+    assert debris.id is not None
+    debris_requirement = add_requirement(
+        session,
+        org.id,
+        debris.id,
+        skill_id=_skill_id(skills_by_name, "Chainsaw Operation"),
+        min_proficiency=2,
+        headcount=2,
+    )
+    execute_mission_transition(session, org.id, debris.id, priya, "submit")
+    execute_mission_transition(session, org.id, debris.id, director, "approve")
+    execute_mission_transition(session, org.id, debris.id, priya, "activate")
+    assert debris_requirement.requirement.id is not None
+    _confirm_assignment(
+        session,
+        org.id,
+        priya,
+        mission_id=debris.id,
+        requirement_id=debris_requirement.requirement.id,
+        crew=crew["nadia"],
+    )
+    _confirm_assignment(
+        session,
+        org.id,
+        priya,
+        mission_id=debris.id,
+        requirement_id=debris_requirement.requirement.id,
+        crew=crew["elliot"],
+    )
+    execute_mission_transition(session, org.id, debris.id, priya, "complete")
+
+    # --- Mission 10: cancelled -- approved, then called off (FR-9's 6th
+    # state, not otherwise reachable from the other 9 missions above).
+    evacuation = create_mission(
+        session,
+        org.id,
+        devon,
+        name="River Valley Wildfire Evacuation",
+        description="Pre-emptive evacuation support for the river valley ahead of the fire line.",
+        start_date=windows["evacuation"][0],
+        end_date=windows["evacuation"][1],
+    )
+    assert evacuation.id is not None
+    add_requirement(
+        session,
+        org.id,
+        evacuation.id,
+        skill_id=_skill_id(skills_by_name, "Wilderness First Aid"),
+        min_proficiency=2,
+        headcount=2,
+    )
+    add_requirement(
+        session,
+        org.id,
+        evacuation.id,
+        skill_id=_skill_id(skills_by_name, "Incident Command"),
+        min_proficiency=2,
+        headcount=1,
+    )
+    execute_mission_transition(session, org.id, evacuation.id, devon, "submit")
+    execute_mission_transition(session, org.id, evacuation.id, director, "approve")
+    execute_mission_transition(session, org.id, evacuation.id, devon, "cancel")
 
 
 # --- Org B: Beacon Relief Network --------------------------------------------
+#
+# T11 leaves this at T9's original scale on purpose -- see the module
+# docstring. Not touched below.
 
 
 def _seed_beacon(session: Session, credentials: list[SeededCredential]) -> None:
@@ -607,10 +1081,11 @@ def seed() -> None:
         _seed_beacon(session, credentials)
 
     print(
-        "Seeded 2 organisations (Northwind Disaster Response, Beacon Relief "
-        "Network), each with a Director, 2 Mission Leads, a crew roster, an "
-        "org-specific skill taxonomy, and missions spanning draft / "
-        "pending_approval / approved / active / completed (FR-19)."
+        "Seeded 2 organisations: Northwind Disaster Response (Director + 3 "
+        "Mission Leads, 50 crew, 10 missions spanning all 6 FR-9 lifecycle "
+        "states) and Beacon Relief Network (Director + 2 Mission Leads, 6 "
+        "crew, 3 missions) -- a large org next to a small one, demonstrating "
+        "tenant isolation (FR-1) holds regardless of org size (FR-19)."
     )
     print()
     _report(credentials)
