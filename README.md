@@ -9,20 +9,59 @@ isolated from every other org's).
 - **Design doc:** [`docs/prd/mission-control.md`](docs/prd/mission-control.md) — the
   full requirements, architecture decisions, and open-question log.
 - **Fast architecture read:** [`docs/design/architecture-explainer.html`](docs/design/architecture-explainer.html)
-  — open it in a browser for the stack choices and the layered request flow in a few
-  minutes, instead of the PRD's full detail.
+  — open it in a browser for the stack choices, the data model, the design patterns,
+  and the layered request flow in a few minutes, instead of the PRD's full detail.
+
+## For reviewers
+
+Everything the brief asks for lives in this repo:
+
+- **Design document** — `docs/prd/mission-control.md`, written before implementation
+  (§0 explains the framing), with the full grilling log (§14) and Refinement log (§13)
+  showing the real back-and-forth, not a document written after the fact.
+- **Source code** — this repo, meaningful commit history (each task merged through its
+  own PR — see the closed PRs and `## 12. Tasks` in the PRD for the task→PR mapping).
+- **AI transcripts, unedited** — `transcripts/` (see `transcripts/README.md` for an
+  index): every subagent's own conversation, plus the full main session, exactly as
+  Claude Code recorded them — including the dead ends and corrections, per the brief's
+  own instruction not to clean these up.
+
+The fastest way to explore: run the [Docker quick start](#quick-start-docker) below,
+which needs nothing but Docker and gives you a populated instance in under a minute —
+or open `docs/design/architecture-explainer.html` first for the five-minute version of
+the whole system before touching any code.
 
 ## Stack
 
-FastAPI + SQLModel (SQLAlchemy) + SQLite, synchronous throughout. `missionctl`
-(Typer + `httpx`) is the primary interface — a thin HTTP client that talks to the API
-exactly like any other caller would (no direct database access). See the PRD §8 for
-the full rationale.
+FastAPI + SQLModel (SQLAlchemy) + SQLite, synchronous throughout, on the backend.
+`missionctl` (Typer + `httpx`) is the primary interface — a thin HTTP client that
+talks to the API exactly like any other caller would (no direct database access). A
+React + Vite + Tailwind SPA (`web/`) is a showcase on top of the same API — see PRD §8
+for the full stack rationale, and §10 #16-18 for why the SPA is scoped the way it is
+(not full CLI parity).
 
-## Setup (clean checkout)
+## Quick start (Docker)
 
-Requires Python 3.11+. No external services — SQLite is a local file, no Postgres,
-Redis, or Docker needed.
+The fastest path — no local Python/Node setup needed, and the container seeds itself
+with demo data on first start (only if the database doesn't already exist, so
+restarting never wipes anything you've done):
+
+```bash
+docker compose up -d
+```
+
+- API: `http://localhost:8100`
+- SPA: `http://localhost:8101`
+- Demo credentials: printed by the seed step on first start —
+  `docker compose logs api | grep -A 999 "demo credentials"` (or see `seed_credentials.txt`
+  inside the container: `docker compose exec api cat seed_credentials.txt`)
+
+Ports are configurable via `.env` (copy `.env.example`) if `8100`/`8101` collide with
+something else on your machine.
+
+## Setup (clean checkout, no Docker)
+
+Requires Python 3.11+.
 
 ```bash
 pip install -r requirements.txt
@@ -32,31 +71,29 @@ uvicorn main:app --reload       # starts the API on http://127.0.0.1:8000
 
 Leave `uvicorn` running in one terminal; run `missionctl` commands from another.
 
+### The showcase SPA (optional)
+
+```bash
+cd web
+npm install
+npm run dev                     # http://localhost:5173, talks to the API above
+```
+
 ## Seed data
 
-`python -m scripts.seed` (re-run any time) builds two demo organisations end to end —
-each with a Director, two Mission Leads, a varied crew roster, its own skill
-taxonomy, and missions spanning several points in the lifecycle — so there's
-something real to explore immediately, with no manual setup:
+`python -m scripts.seed` (re-run any time — every run starts from a fresh database
+file, so it's "fresh file, full rebuild," not incremental) builds two demo
+organisations end to end — deliberately very different in scale, to show tenant
+isolation holds regardless of org size:
 
-- **Northwind Disaster Response** — 6 skills (Wilderness First Aid, Swift-Water
-  Rescue, Chainsaw Operation, Incident Command, Drone Piloting, Logistics
-  Coordination), 7 crew members with deliberately varied proficiencies and
-  availability, and 3 missions: one `draft`, one `pending_approval`, one `active`
-  (partially staffed on purpose, to show FR-17's fulfillment visibility).
-- **Beacon Relief Network** — a completely different 6-skill taxonomy (Community
-  Outreach, Bilingual Translation, Warehouse Management, Mental Health First Aid,
-  Water Purification, Supply Chain Logistics), 6 crew members, and 3 missions: one
-  `draft`, one `approved`, one `completed` (the full happy-path lifecycle, fully
-  staffed).
+- **Northwind Disaster Response** — a large roster and a full spread of missions
+  across every lifecycle state, with real proficiency/availability variation so the
+  matcher's hard filters have genuine exclusions to show, not just a uniform pool.
+- **Beacon Relief Network** — a smaller org with its own, completely independent
+  6-skill taxonomy, for contrast.
 
-That's 5 of the 6 lifecycle states represented out of the box (the 6th, `cancelled`,
-is one `missionctl mission cancel <id>` away from any pre-completed mission).
-
-**Every run starts from a fresh database file.** The script deletes any existing
-`mission_control.db` before creating tables, so it isn't incremental/idempotent —
-it's "fresh file, full rebuild," which is simpler and sufficient here. Don't run it
-against a database you want to keep.
+(Exact counts are in `scripts/seed.py`'s own docstring and printed summary — kept
+here deliberately brief so this doesn't drift out of sync with the script.)
 
 ### Demo credentials
 
@@ -65,13 +102,6 @@ The seed script generates a real, random password for every user (never blank) a
 - prints an `email -> password` table to stdout at the end of the run, and
 - writes the same table to `seed_credentials.txt` at the repo root (gitignored —
   never committed).
-
-Run `python -m scripts.seed` and read either of those for login credentials. A few
-of the emails, for reference: `director.dana@northwind.demo`,
-`lead.marcus@northwind.demo`, `sam.rivera@northwind.demo` (Northwind);
-`director.elena@beacon.demo`, `lead.omar@beacon.demo`, `liam.oconnor@beacon.demo`
-(Beacon) — passwords are only ever in the generated output, not in this file or in
-source control.
 
 ## Using the CLI
 
@@ -102,11 +132,17 @@ missions, matching & assignment, listing).
 pytest -v
 ```
 
-Runs against real temporary SQLite databases (not mocks) — see PRD §8. 137 tests
-cover tenant isolation, RBAC, the mission lifecycle state machine, the matcher's
-filtering/scoring, and assignment propose/respond/double-booking.
+Runs against real temporary SQLite databases (not mocks) — see PRD §8. Covers tenant
+isolation, RBAC, the mission lifecycle state machine, the matcher's filtering/scoring,
+and assignment propose/respond/double-booking.
 
 ```bash
 ruff check .
 ruff format --check .
 ```
+
+## CI / Docker images
+
+Every PR and push to `main`/`feature/mission-control` runs the same checks above
+(`.github/workflows/ci.yml`) plus builds and publishes the API and SPA images to GHCR
+(`.github/workflows/docker-publish.yml`) — see PRD §8/§13 (R-4) for why.
