@@ -4,32 +4,88 @@ import { LoginScreen } from "./screens/LoginScreen";
 import { MissionListScreen } from "./screens/MissionListScreen";
 import { MissionDetailScreen } from "./screens/MissionDetailScreen";
 import { MyAssignmentsScreen } from "./screens/MyAssignmentsScreen";
-import { AssignmentsNavIcon, MissionsNavIcon, Sidebar } from "./components/Sidebar";
+import { CrewListScreen } from "./screens/CrewListScreen";
+import { CrewProfileScreen } from "./screens/CrewProfileScreen";
+import { SkillsScreen } from "./screens/SkillsScreen";
+import { MyProfileScreen } from "./screens/MyProfileScreen";
+import {
+  AssignmentsNavIcon,
+  CrewNavIcon,
+  MissionsNavIcon,
+  ProfileNavIcon,
+  Sidebar,
+  SkillsNavIcon,
+  type NavItem,
+} from "./components/Sidebar";
 import { Spinner } from "./components/Spinner";
 
-/** Mission Lead / Director: mission list -> mission detail. No router —
- * two screens deep, local `useState` is the whole navigation stack
- * (PRD §7: "no routing depth" for this showcase). */
-function MissionsSection() {
-  const [selectedMissionId, setSelectedMissionId] = useState<number | null>(null);
+type DirectorLeadSection = "missions" | "crew" | "skills";
 
-  return (
-    <div className="flex min-h-screen">
-      <Sidebar navLabel="Missions" navIcon={MissionsNavIcon} />
-      {selectedMissionId === null ? (
+const DIRECTOR_LEAD_NAV: NavItem[] = [
+  { key: "missions", label: "Missions", icon: MissionsNavIcon },
+  { key: "crew", label: "Crew", icon: CrewNavIcon },
+  { key: "skills", label: "Skills", icon: SkillsNavIcon },
+];
+
+/** Director / Mission Lead: Missions (existing), Crew (roster -> read-only
+ * profile, FR-4), Skills (org taxonomy, FR-5). No router — each is a
+ * sibling top-level section, and within Missions/Crew a `useState` stack
+ * two screens deep at most (PRD §7: "no routing depth"). */
+function DirectorLeadApp() {
+  const [section, setSection] = useState<DirectorLeadSection>("missions");
+  const [selectedMissionId, setSelectedMissionId] = useState<number | null>(null);
+  const [selectedCrewId, setSelectedCrewId] = useState<number | null>(null);
+
+  function selectSection(key: string) {
+    setSection(key as DirectorLeadSection);
+    // Leaving a section resets its drill-down so coming back starts at the list.
+    setSelectedMissionId(null);
+    setSelectedCrewId(null);
+  }
+
+  let content;
+  if (section === "missions") {
+    content =
+      selectedMissionId === null ? (
         <MissionListScreen onSelectMission={setSelectedMissionId} />
       ) : (
         <MissionDetailScreen missionId={selectedMissionId} onBack={() => setSelectedMissionId(null)} />
-      )}
+      );
+  } else if (section === "crew") {
+    content =
+      selectedCrewId === null ? (
+        <CrewListScreen onSelectCrew={setSelectedCrewId} />
+      ) : (
+        <CrewProfileScreen crewId={selectedCrewId} onBack={() => setSelectedCrewId(null)} />
+      );
+  } else {
+    content = <SkillsScreen />;
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar items={DIRECTOR_LEAD_NAV} activeKey={section} onSelect={selectSection} />
+      {content}
     </div>
   );
 }
 
-function CrewSection() {
+type CrewMemberSection = "assignments" | "profile";
+
+const CREW_MEMBER_NAV: NavItem[] = [
+  { key: "assignments", label: "My assignments", icon: AssignmentsNavIcon },
+  { key: "profile", label: "My profile", icon: ProfileNavIcon },
+];
+
+/** Crew Member: My Assignments (existing) + My Profile (new: self-service
+ * profile/skills/availability, FR-4/FR-6/FR-7). */
+function CrewMemberApp() {
+  const [section, setSection] = useState<CrewMemberSection>("assignments");
+
   return (
     <div className="flex min-h-screen">
-      <Sidebar navLabel="My assignments" navIcon={AssignmentsNavIcon} />
-      <MyAssignmentsScreen />
+      <Sidebar items={CREW_MEMBER_NAV} activeKey={section} onSelect={(key) => setSection(key as CrewMemberSection)} />
+      {section === "assignments" ? <MyAssignmentsScreen /> : <MyProfileScreen />}
     </div>
   );
 }
@@ -49,12 +105,11 @@ export default function App() {
     return <LoginScreen />;
   }
 
-  // Role-conditional rendering off the logged-in user's role (§10 #23):
-  // Director/Mission Lead run missions; Crew Member only sees their own
-  // assignments. Crew profile/skills/availability stay CLI-only (out of
-  // scope for this showcase — see PRD §10 #16-18).
+  // Role-conditional nav off the logged-in user's role (§10 #23, extended
+  // for T8b): Director/Mission Lead get Missions/Crew/Skills; Crew Member
+  // gets My Assignments/My Profile.
   if (user.role === "crew_member") {
-    return <CrewSection />;
+    return <CrewMemberApp />;
   }
-  return <MissionsSection />;
+  return <DirectorLeadApp />;
 }

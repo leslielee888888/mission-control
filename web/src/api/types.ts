@@ -88,3 +88,47 @@ export interface FieldError {
   field: string;
   message: string;
 }
+
+/** One entry in a Director/Lead's org roster (`GET /crew`, api/routes/crew.py). */
+export interface CrewRosterEntry {
+  user_id: number;
+  name: string;
+  email: string;
+  skill_count: number;
+}
+
+/** A skill proficiency held by a crew member, as it appears on their profile. */
+export interface CrewSkill {
+  skill_id: number;
+  skill_name: string;
+  proficiency: number;
+}
+
+/** `GET /crew/{id}/profile` response — self, or (Director/Lead) another
+ * crew member's, read-only in that case. */
+export interface CrewProfile {
+  user_id: number;
+  org_id: number;
+  name: string;
+  email: string;
+  contact: string | null;
+  bio: string | null;
+  skills: CrewSkill[];
+}
+
+/** An org-scoped skill taxonomy entry (`/skills`, FR-5). */
+export interface Skill {
+  id: number;
+  org_id: number;
+  name: string;
+  category: string | null;
+}
+
+/** An unavailability window on a crew member's profile (FR-7). Absent any
+ * window, a crew member defaults to available. */
+export interface AvailabilityWindow {
+  id: number;
+  crew_id: number;
+  start_date: string;
+  end_date: string;
+}

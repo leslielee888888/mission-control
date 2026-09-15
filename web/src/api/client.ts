@@ -15,11 +15,16 @@
 
 import type {
   Assignment,
+  AvailabilityWindow,
+  CrewProfile,
+  CrewRosterEntry,
+  CrewSkill,
   FieldError,
   LoginResponse,
   Mission,
   MissionDetail,
   RequirementMatch,
+  Skill,
   User,
 } from "./types";
 
@@ -108,6 +113,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 const get = <T>(path: string): Promise<T> => request<T>(path, { method: "GET" });
 const post = <T>(path: string, data?: unknown): Promise<T> =>
   request<T>(path, { method: "POST", body: data === undefined ? undefined : JSON.stringify(data) });
+const patch = <T>(path: string, data: unknown): Promise<T> =>
+  request<T>(path, { method: "PATCH", body: JSON.stringify(data) });
+const put = <T>(path: string, data: unknown): Promise<T> =>
+  request<T>(path, { method: "PUT", body: JSON.stringify(data) });
+const del = <T>(path: string): Promise<T> => request<T>(path, { method: "DELETE" });
 
 export const api = {
   auth: {
@@ -142,5 +152,34 @@ export const api = {
       }),
     respond: (assignmentId: number, action: "accept" | "decline"): Promise<Assignment> =>
       post<Assignment>(`/assignments/${assignmentId}/respond`, { action }),
+  },
+  crew: {
+    /** Director/Lead only: the org's crew_member roster (api/routes/crew.py). */
+    list: (): Promise<CrewRosterEntry[]> => get<CrewRosterEntry[]>("/crew"),
+    /** Self, or (Director/Lead) another crew member's — read-only for the
+     * latter case; the API itself enforces who may edit. */
+    profile: (userId: number): Promise<CrewProfile> => get<CrewProfile>(`/crew/${userId}/profile`),
+    /** Self only. Only the given fields change (PATCH semantics). */
+    updateProfile: (
+      userId: number,
+      patchData: { name?: string; contact?: string; bio?: string },
+    ): Promise<CrewProfile> => patch<CrewProfile>(`/crew/${userId}/profile`, patchData),
+    /** Self, or a Director acting on the crew member's behalf. Upserts by
+     * skill name — adds the skill if not already held, else updates it. */
+    setSkill: (userId: number, skillName: string, proficiency: number): Promise<CrewSkill> =>
+      put<CrewSkill>(`/crew/${userId}/skills`, { skill_name: skillName, proficiency }),
+    listAvailability: (userId: number): Promise<AvailabilityWindow[]> =>
+      get<AvailabilityWindow[]>(`/crew/${userId}/availability`),
+    addAvailability: (userId: number, startDate: string, endDate: string): Promise<AvailabilityWindow> =>
+      post<AvailabilityWindow>(`/crew/${userId}/availability`, { start_date: startDate, end_date: endDate }),
+    removeAvailability: (userId: number, windowId: number): Promise<void> =>
+      del<void>(`/crew/${userId}/availability/${windowId}`),
+  },
+  skills: {
+    /** Any authenticated user in the org (api/routes/skills.py). */
+    list: (): Promise<Skill[]> => get<Skill[]>("/skills"),
+    /** Director only. */
+    create: (name: string, category?: string): Promise<Skill> =>
+      post<Skill>("/skills", { name, category: category ?? null }),
   },
 };

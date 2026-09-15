@@ -12,7 +12,21 @@ function Logo() {
   );
 }
 
-export function Sidebar({ navLabel, navIcon }: { navLabel: string; navIcon: ReactNode }) {
+export interface NavItem {
+  key: string;
+  label: string;
+  icon: ReactNode;
+}
+
+export function Sidebar({
+  items,
+  activeKey,
+  onSelect,
+}: {
+  items: NavItem[];
+  activeKey: string;
+  onSelect: (key: string) => void;
+}) {
   const { user, logout } = useAuth();
 
   return (
@@ -23,10 +37,20 @@ export function Sidebar({ navLabel, navIcon }: { navLabel: string; navIcon: Reac
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        <div className="flex items-center gap-2.5 rounded-lg bg-accent-2 px-3 py-2.5 text-[13.5px] font-medium text-accent-dark">
-          {navIcon}
-          {navLabel}
-        </div>
+        {items.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onSelect(item.key)}
+            aria-current={item.key === activeKey ? "page" : undefined}
+            className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-[13.5px] font-medium ${
+              item.key === activeKey ? "bg-accent-2 text-accent-dark" : "text-text-2 hover:bg-surface-2"
+            }`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
       </nav>
 
       <div className="flex-1" />
@@ -68,5 +92,26 @@ export const AssignmentsNavIcon = (
   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
     <path d="M9 12l2 2 4-4" />
     <circle cx="12" cy="12" r="9" />
+  </svg>
+);
+
+export const CrewNavIcon = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <circle cx="9" cy="8" r="3.25" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M16.5 5.5a3.25 3.25 0 0 1 0 6.4M21.5 20a5.5 5.5 0 0 0-4.5-6.4" />
+  </svg>
+);
+
+export const SkillsNavIcon = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <path d="M12 2.5l2.6 5.5 6 .8-4.4 4.3 1.1 6-5.3-2.9-5.3 2.9 1.1-6-4.4-4.3 6-.8z" />
+  </svg>
+);
+
+export const ProfileNavIcon = (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+    <circle cx="12" cy="8" r="3.75" />
+    <path d="M4 20.5a8 8 0 0 1 16 0" />
   </svg>
 );
