@@ -83,6 +83,18 @@ def test_whoami_without_a_stored_session_fails(tmp_path: Path) -> None:
     assert "not logged in" in result.output.lower()
 
 
+def test_whoami_with_a_corrupted_session_file_fails_cleanly(tmp_path: Path) -> None:
+    # A truncated/corrupted file (e.g. the process was killed mid-write
+    # during a prior login) is treated the same as "no session" — the
+    # friendly message below, not a raw JSONDecodeError traceback.
+    (tmp_path / "session.json").write_text("{not valid json")
+
+    result = runner.invoke(app, ["whoami"])
+
+    assert result.exit_code != 0
+    assert "not logged in" in result.output.lower()
+
+
 def test_whoami_with_a_stored_session_calls_the_api(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

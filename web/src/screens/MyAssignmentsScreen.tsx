@@ -17,6 +17,7 @@ const STATUS_ORDER: Record<AssignmentStatus, number> = { proposed: 0, confirmed:
 interface RespondVars {
   assignmentId: number;
   action: "accept" | "decline";
+  missionId: number;
 }
 
 export function MyAssignmentsScreen() {
@@ -60,7 +61,14 @@ export function MyAssignmentsScreen() {
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["assignments"], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["assignments"] }),
+    onSettled: (_data, _err, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
+      // Accepting/declining changes that requirement's confirmed headcount —
+      // without this, a Director watching the mission's Fulfillment panel
+      // sees the stale pre-response count until the query's own staleTime
+      // lapses.
+      queryClient.invalidateQueries({ queryKey: ["mission", vars.missionId] });
+    },
   });
 
   return (
@@ -128,14 +136,18 @@ export function MyAssignmentsScreen() {
                   <div className="flex gap-2.5">
                     <button
                       type="button"
-                      onClick={() => respondMutation.mutate({ assignmentId: assignment.id, action: "accept" })}
+                      onClick={() =>
+                        respondMutation.mutate({ assignmentId: assignment.id, action: "accept", missionId: assignment.mission_id })
+                      }
                       className="rounded-md bg-accent px-[18px] py-2 text-sm font-semibold text-white"
                     >
                       Accept
                     </button>
                     <button
                       type="button"
-                      onClick={() => respondMutation.mutate({ assignmentId: assignment.id, action: "decline" })}
+                      onClick={() =>
+                        respondMutation.mutate({ assignmentId: assignment.id, action: "decline", missionId: assignment.mission_id })
+                      }
                       className="rounded-md border border-border bg-surface px-[18px] py-2 text-sm font-semibold text-text-2"
                     >
                       Decline
@@ -164,7 +176,11 @@ export function MyAssignmentsScreen() {
                 <ErrorBanner
                   message={`Couldn't ${respondMutation.variables?.action} — ${errorMessage(respondMutation.error, "something went wrong.")}`}
                   onRetry={() =>
-                    respondMutation.mutate({ assignmentId: assignment.id, action: respondMutation.variables!.action })
+                    respondMutation.mutate({
+                      assignmentId: assignment.id,
+                      action: respondMutation.variables!.action,
+                      missionId: assignment.mission_id,
+                    })
                   }
                 />
               )}

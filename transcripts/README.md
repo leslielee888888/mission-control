@@ -20,7 +20,7 @@ raw JSONL is the artifact that actually satisfies "unedited."
 | File | What it is |
 |---|---|
 | `2026-09-14-prd-discovery-grilling.{md,jsonl}` | The Discovery-stage grilling session — PRD confirmed via `grill-me`, all 24 decisions. |
-| `2026-09-15-main-session-full.jsonl` | The complete main session, start to (whenever this was last refreshed) — everything: Discovery, `/tasks create`, and directing every subagent below through Development. 2,953 lines, ~6.5MB. Supersedes the grilling-only file above as the complete record; that file is kept as the earlier, focused snapshot it always was. |
+| `2026-09-15-main-session-full.jsonl` | The complete main session — Discovery, `/tasks create`, directing every subagent below through Development, and the whole Refinement stage (R-1 through R-9: CI/Docker, NAS deployment, seed data + auto-seed, the demo-password fixes, adding mission creation to the SPA, connecting the PR review dashboard) through Finalize. Refreshed as the session continued past its original Sep 15 export — kept this filename rather than fragmenting one continuous session across a date rollover. Supersedes the grilling-only file above as the complete record; that file is kept as the earlier, focused snapshot it always was. |
 
 ## `subagents/` — every dispatched agent's own transcript
 
@@ -44,6 +44,18 @@ session that spawned it. These are those files, one per agent, named
 
 (T10 — this task — has no subagent transcript of its own; it's the main
 session directly, captured in the full session file above.)
+
+### Post-Development, agent-dispatched work
+
+Two more tasks were built by dispatched agents after the original T1–T10
+batch, in response to direct user requests rather than the original task
+plan — the main session's own transcript (above) has the surrounding
+context (review, merge, follow-up fixes) for both.
+
+| What | Agent | File |
+|---|---|---|
+| Complete the showcase SPA (Crew and Skills screens, role-conditional nav) | `fe-programmer` | `2026-09-15-t8b-complete-spa-crew-skills-a5d9bd85.jsonl` |
+| T11 — scale Org 1's seed data to 50 crew/10 missions, auto-seed on container start (R-6) | `python-programmer` | `2026-09-15-t11-seed-data-scale-up-a24b6587.jsonl` |
 
 ### Discovery-stage design review
 
@@ -76,6 +88,38 @@ This review is what caught T1's import-time database-write bug (fixed
 before merging PR #11) — see the main session transcript around that PR
 for the fix itself, which the main session made directly rather than via
 another subagent.
+
+### `/code-review high` on PR #22 (Finalize)
+
+The Gate 2 review — the whole `feature/mission-control` → `main` diff (129
+files, ~32.9k insertions). Same shape as the PR #11 review above: one
+orchestrator, 9 independent angle scanners (Angle A split into a backend and
+a frontend pass, given the diff's size), each capped at 6 candidates, with
+the highest-priority correctness candidates re-checked by parallel
+verifiers before the final report.
+
+| Role | File |
+|---|---|
+| Orchestrator | `2026-09-16-code-review-pr22-finalize-orchestrator-a26df7e8.jsonl` |
+| Angle: line-by-line diff scan — backend | `2026-09-16-code-review-pr22-angle-line-by-line-backend-a2cc44f4.jsonl` |
+| Angle: line-by-line diff scan — frontend | `2026-09-16-code-review-pr22-angle-line-by-line-frontend-a306ec56.jsonl` |
+| Angle: removed-behavior auditor | `2026-09-16-code-review-pr22-angle-removed-behavior-ae3ac6c6.jsonl` |
+| Angle: cross-file tracer | `2026-09-16-code-review-pr22-angle-cross-file-tracer-a4982ef7.jsonl` |
+| Angle: duplicate/existing-helper (reuse) scan | `2026-09-16-code-review-pr22-angle-reuse-adbfaf97.jsonl` |
+| Angle: simplification (unnecessary complexity) scan | `2026-09-16-code-review-pr22-angle-simplification-ae7c83f2.jsonl` |
+| Angle: efficiency (wasted work) scan | `2026-09-16-code-review-pr22-angle-efficiency-a19b64c2.jsonl` |
+| Angle: altitude audit | `2026-09-16-code-review-pr22-angle-altitude-a64f7d0e.jsonl` |
+| Angle: CLAUDE.md conventions scan | `2026-09-16-code-review-pr22-angle-conventions-a7f84ec6.jsonl` |
+
+10 findings after verification, 2 refuted (a duplicate-error-class false
+positive, and R-8's static demo password — an already-discussed, accepted
+decision, not an unflagged one). The other 8 are logged in the PRD's
+Refinement log as R-10: 7 fixed directly (a CLI robustness bug, a CI tag
+gate that could ship an unfinalized feature-branch build to the NAS, an
+auth-context over-eager logout, an SPA privilege-routing tightening, two
+stale-cache invalidation gaps, and one misleading screen subtitle), and 3
+concurrent-request race conditions logged as a new open question (Q27)
+rather than fixed — see R-10 and Q27 for why.
 
 ## Convention
 

@@ -50,12 +50,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // An expired/revoked token: whoami 401s (which also fires logout via
   // configureUnauthorizedHandler above, but that's async — this covers the
-  // render before that runs).
+  // render before that runs). Scoped to 401 specifically — a transient
+  // network blip or a backend 500 on `whoami` is also `whoami.isError`, but
+  // isn't evidence the token is invalid, so it must not clear a still-good
+  // token and bounce the user back to the login screen.
   useEffect(() => {
-    if (token !== null && whoami.isError) {
+    if (token !== null && whoami.error instanceof ApiError && whoami.error.status === 401) {
       logout();
     }
-  }, [token, whoami.isError, logout]);
+  }, [token, whoami.error, logout]);
 
   const loginMutation = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) => api.auth.login(email, password),

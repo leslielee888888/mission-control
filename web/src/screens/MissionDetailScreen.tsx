@@ -52,7 +52,13 @@ export function MissionDetailScreen({ missionId, onBack }: { missionId: number; 
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["mission", missionId], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["mission", missionId] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["mission", missionId] });
+      // Also the list — its status filter counts and this row's badge would
+      // otherwise show the pre-approve status until the list's own 15s
+      // staleTime lapses.
+      queryClient.invalidateQueries({ queryKey: ["missions"] });
+    },
   });
 
   const rejectMutation = useMutation({
@@ -70,7 +76,10 @@ export function MissionDetailScreen({ missionId, onBack }: { missionId: number; 
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["mission", missionId], context.previous);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["mission", missionId] }),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["mission", missionId] });
+      queryClient.invalidateQueries({ queryKey: ["missions"] });
+    },
   });
 
   const proposeMutation = useMutation({

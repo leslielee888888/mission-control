@@ -63,7 +63,9 @@ export function MissionCreateScreen({
       <div>
         <div className="text-[22px] font-bold">New mission</div>
         <div className="mt-0.5 text-[13px] text-text-2">
-          Starts in draft — add requirements and submit for approval once it's created.
+          Starts in draft. Adding requirements and submitting for approval isn't in this
+          showcase UI yet — use <code className="font-mono">missionctl mission add-requirement</code> and{" "}
+          <code className="font-mono">missionctl mission submit</code> from the CLI.
         </div>
       </div>
 

@@ -54,7 +54,14 @@ def _load_session() -> dict[str, Any] | None:
     path = _session_file()
     if not path.exists():
         return None
-    return json.loads(path.read_text())
+    # A truncated/corrupted file (e.g. the process was killed mid-write
+    # during a prior login) is treated the same as "no session" — the
+    # friendly "not logged in" message every other auth-missing path
+    # already gives, not a raw JSONDecodeError traceback.
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def _print_json(payload: Any) -> None:

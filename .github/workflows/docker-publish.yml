@@ -6,6 +6,15 @@ name: Publish Docker images
 # is enough, since this is already a GitHub repo. Runs after CI's checks
 # would already have passed on the same commit (this workflow doesn't
 # re-lint/re-test - ci.yml is the gate; this is publish-only).
+#
+# `:latest` is reserved for `main` (docker/metadata-action's
+# `is_default_branch`): every push, including a task/feature branch
+# mid-Development, still gets an immutable `:<sha>` tag, but only a merge to
+# `main` moves `:latest` - so a `docker compose pull` against `:latest` (the
+# NAS's default, docker-compose.yml) always lands on a vetted main-branch
+# release, never an in-progress feature-branch build. Found in Finalize
+# code review; before this, every push to feature/mission-control also
+# clobbered `:latest`.
 
 on:
   push:
@@ -33,13 +42,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.API_IMAGE }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.API_IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.API_IMAGE }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
   web:
     name: Build + push SPA image
@@ -56,10 +73,18 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}
+          tags: |
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - uses: docker/build-push-action@v6
         with:
           context: web
           push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:${{ github.sha }}
-            ${{ env.REGISTRY }}/${{ env.WEB_IMAGE }}:latest
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

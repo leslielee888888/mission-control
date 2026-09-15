@@ -1,12 +1,12 @@
 # PRD: Mission Control
 
-- **Status:** `Draft` → **`Discovery`** → `In development` → `Refinement` → `Finalize` → `Shipped`
+- **Status:** `Draft` → `Discovery` → `In development` → `Refinement` → **`Finalize`** → `Shipped`
 - **Author:** Leslie
 - **Repo:** [`leslielee888888/mission-control`](https://github.com/leslielee888888/mission-control) — new
   standalone repo, created for this challenge. This doc, the source code, and the full
   unedited AI transcripts all live here, since the whole repo is what gets shared with
   Mutinex (not split across Leslie's private `ai-docs`).
-- **Last updated:** 2026-09-14
+- **Last updated:** 2026-09-16
 - **Reviewers:** Leslie (self-owned). This document is also the **design document**
   Mutinex's brief asks for — the artifact "you would use to communicate the intended
   solution to an engineering team and guide an AI coding agent" — submitted alongside
@@ -152,48 +152,48 @@ but only the former needs test evidence.
 
 **Real, tested vertical slice:**
 
-- [ ] A multi-tenant API enforces org scoping on every record and role-based access on
+- [x] A multi-tenant API enforces org scoping on every record and role-based access on
       every endpoint (FR-1–FR-3), with a test proving org A cannot read or write org B's
       data even with a valid token.
-- [ ] Username+password login (FR-2) verifies against a hashed password and issues a
+- [x] Username+password login (FR-2) verifies against a hashed password and issues a
       hashed, opaque bearer token; a missing/invalid token or wrong credentials return
       401.
-- [ ] The mission lifecycle (draft → pending approval → approved → active → completed,
+- [x] The mission lifecycle (draft → pending approval → approved → active → completed,
       plus reject/cancel) is enforced server-side, and a Director cannot approve a
       mission they created (FR-9–FR-11).
-- [ ] The auto-matching engine filters on hard constraints and ranks on soft factors at
+- [x] The auto-matching engine filters on hard constraints and ranks on soft factors at
       the defined weights, with visible reasoning per suggestion (FR-13).
-- [ ] Assignment propose/respond and the double-booking guard work end to end
+- [x] Assignment propose/respond and the double-booking guard work end to end
       (FR-14–FR-16).
-- [ ] Test evidence for everything above is a handful of representative cases per area
+- [x] Test evidence for everything above is a handful of representative cases per area
       (tenant isolation, self-approval gate, matcher scoring, lifecycle transitions) —
       not exhaustive coverage (§10 #17).
 
 **Lighter / scaffolding (real seed data; minimal-effort or mocked where time is short):**
 
-- [ ] Crew management — skill profiles (org-scoped taxonomy, per-crew proficiency) and
+- [x] Crew management — skill profiles (org-scoped taxonomy, per-crew proficiency) and
       availability (FR-4–FR-7) — functions well enough to feed the vertical slice
       above; not a testing priority.
-- [ ] A CLI exercises every primary workflow — login, crew/skill/availability
+- [x] A CLI exercises every primary workflow — login, crew/skill/availability
       management, mission planning through approval, running the matcher, assignment
       response — entirely by calling the real API (FR-18); the CLI is the system of
       record for this coverage, not the SPA (§10 #19).
-- [ ] A minimal React SPA (FR-21) shows mission list/detail, a matcher run, and
+- [x] A minimal React SPA (FR-21) shows mission list/detail, a matcher run, and
       propose/approve/accept actions for all three roles, with real or mocked data as
       the vertical-slice boundary allows (§10 #16–#18, #23).
 
 **Always required:**
 
-- [ ] The repo runs locally from a clean checkout with documented setup steps and seed
+- [x] The repo runs locally from a clean checkout with documented setup steps and seed
       data demonstrating ≥2 tenants (FR-19).
-- [ ] The design document (this file) was written before implementation and is the
+- [x] The design document (this file) was written before implementation and is the
       artifact that guided the agent — checked by the grilling log (§14) and the
       refinement log (§13) actually reflecting real back-and-forth.
-- [ ] Every AI-tool conversation from the build (main session + every subagent) is
-      captured unedited in `transcripts/` in this repo (§8) — in progress; see
-      `transcripts/2026-09-14-prd-discovery-grilling.{md,jsonl}` for the Discovery
-      grilling session itself.
-- [ ] Commit history on the repo is meaningful (not one squashed blob) and public.
+- [x] Every AI-tool conversation from the build (main session + every subagent) is
+      captured unedited in `transcripts/` in this repo (§8) — refreshed at Finalize
+      to also cover Refinement (R-1–R-9) and Finalize itself, not just Development;
+      see `transcripts/README.md` for the full index.
+- [x] Commit history on the repo is meaningful (not one squashed blob) and public.
 
 ## 6. Requirements
 
@@ -409,6 +409,7 @@ All resolved via `grill-me` (Discovery grilling, 2026-09-14 — round-by-round r
 | Q24 | Auth mechanism: tokens vs. real login | Originally scoped as seed-issued static tokens (Q10); reversed after reviewing the shape of the auth flow | Real `POST /auth/login` (email + password), passwords hashed at rest (bcrypt/argon2), returns an opaque bearer token used on subsequent requests — same FR-2 token mechanics, different issuance. One shared model for both CLI (`login <email> <password>`) and SPA. Seed script generates and documents demo passwords. Still fits inside §3's Non-goals boundary — no OAuth/SSO/refresh/reset, just a real login instead of a pre-issued token. | Leslie |
 | Q25 | SPA styling approach | Undecided since FR-21 was added — hand-rolled CSS vs. a utility framework | Tailwind CSS. Fast to build 2-3 screens with utility classes; no component stylesheet to maintain past this showcase, no design-token system to build for something this small. | Leslie |
 | Q26 | Duplicate propose — same crew member twice on one requirement | Surfaced during T6 (R-3, Refinement) — FR-14 doesn't say whether proposing the same crew member for a requirement they're already `proposed`/`confirmed` on should be blocked; today it silently creates a second row, consuming a second headcount slot for one person | **Open — not yet decided.** No guard built; flagged rather than silently fixed since it's a real gap, not obviously wrong either way for a take-home's scope. Leslie to decide: block it (409, "already proposed/confirmed"), or leave as-is since nothing in FR-14 forbids it and it's an edge case a Lead is unlikely to hit by accident. | Leslie |
+| Q27 | Concurrent-request races on the headcount/overlap guards (FR-14, FR-16, FR-7) | Surfaced in Finalize's `/code-review high` on PR #22 — `propose_assignment`, `respond_to_assignment`'s accept path, and `add_availability_window` each do a check (headcount / double-booking / overlap) and the write as two separate, unlocked steps. Two genuinely concurrent requests (two tabs, a client retry) can both pass the check before either commits, silently violating the guard. | **Open — not fixed.** None of FR-7/FR-14/FR-16 ever specified concurrent-request behavior, and closing this needs an explicit locking/transaction strategy (SQLite has no real row-level locking), which is a design decision, not a one-line fix — out of scope for a take-home's "representative test cases, not exhaustive coverage" bar (§10 #17), and this system's only live traffic is one person clicking through a LAN demo. Flagged rather than silently accepted: a genuinely concurrent-request test would need to be added alongside whatever guard is built, when this gets picked up. | Leslie |
 
 ## 11. Rollout
 
@@ -450,23 +451,42 @@ rather than silently shipping less than what's written above.
 
 ## 12. Tasks
 
-**Progress:** 10 tasks · 0 done (0%)
+**Progress:** 10 tasks · 10 done (100%) — plus ad hoc Refinement-stage work (T8b, T11 — see
+`## 13. Refinement log`; not tracked as GitHub issues, since they postdate Development)
 
-Milestone: [Mission Control](https://github.com/leslielee888888/mission-control/milestone/1) ·
-Project: [Mission Control](https://github.com/leslielee888888/mission-control/projects) (owner: leslielee888888)
+Milestone: [Mission Control](https://github.com/leslielee888888/mission-control/milestone/1) (10/10 closed) ·
+Project: [Mission Control](https://github.com/leslielee888888/mission-control/projects/8) (owner: leslielee888888)
 
 | ID | Task | Reqs | Owner | Depends on | Issue | Status |
 |----|------|------|-------|------------|-------|--------|
-| T1 | Scaffold — project layout, DB models, seed skeleton, error handling | FR-20 | `python-programmer` | — | [#1](https://github.com/leslielee888888/mission-control/issues/1) | todo |
-| T2 | Auth + RBAC + tenant scoping | FR-1, FR-2, FR-3 | `python-programmer` | T1 | [#2](https://github.com/leslielee888888/mission-control/issues/2) | todo |
-| T3 | Crew management — profile, skills, availability | FR-4, FR-5, FR-6, FR-7 | `python-programmer` | T2 | [#3](https://github.com/leslielee888888/mission-control/issues/3) | todo |
-| T4 | Mission lifecycle + approval gate | FR-8, FR-9, FR-10, FR-11, FR-12, FR-17 | `python-programmer` | T2 | [#4](https://github.com/leslielee888888/mission-control/issues/4) | todo |
-| T5 | Matching engine — retrieval + ranking | FR-13 | `python-programmer` | T3, T4 | [#5](https://github.com/leslielee888888/mission-control/issues/5) | todo |
-| T6 | Assignments — propose, respond, double-booking guard | FR-14, FR-15, FR-16 | `python-programmer` | T5 | [#6](https://github.com/leslielee888888/mission-control/issues/6) | todo |
-| T7 | CLI (`missionctl`) — full workflow coverage | FR-18 | `python-programmer` | T2, T3, T4, T5, T6 | [#7](https://github.com/leslielee888888/mission-control/issues/7) | todo |
-| T8 | Web UI showcase SPA | FR-21 | `fe-programmer` | T2, T4, T5, T6 | [#8](https://github.com/leslielee888888/mission-control/issues/8) | todo |
-| T9 | Seed data, README, end-to-end verification | FR-19 | `python-programmer` | T7 | [#9](https://github.com/leslielee888888/mission-control/issues/9) | todo |
-| T10 | Transcript packaging | — | Leslie | T9 | [#10](https://github.com/leslielee888888/mission-control/issues/10) | todo |
+| T1 | Scaffold — project layout, DB models, seed skeleton, error handling | FR-20 | `python-programmer` | — | [#1](https://github.com/leslielee888888/mission-control/issues/1) | done |
+| T2 | Auth + RBAC + tenant scoping | FR-1, FR-2, FR-3 | `python-programmer` | T1 | [#2](https://github.com/leslielee888888/mission-control/issues/2) | done |
+| T3 | Crew management — profile, skills, availability | FR-4, FR-5, FR-6, FR-7 | `python-programmer` | T2 | [#3](https://github.com/leslielee888888/mission-control/issues/3) | done |
+| T4 | Mission lifecycle + approval gate | FR-8, FR-9, FR-10, FR-11, FR-12, FR-17 | `python-programmer` | T2 | [#4](https://github.com/leslielee888888/mission-control/issues/4) | done |
+| T5 | Matching engine — retrieval + ranking | FR-13 | `python-programmer` | T3, T4 | [#5](https://github.com/leslielee888888/mission-control/issues/5) | done |
+| T6 | Assignments — propose, respond, double-booking guard | FR-14, FR-15, FR-16 | `python-programmer` | T5 | [#6](https://github.com/leslielee888888/mission-control/issues/6) | done |
+| T7 | CLI (`missionctl`) — full workflow coverage | FR-18 | `python-programmer` | T2, T3, T4, T5, T6 | [#7](https://github.com/leslielee888888/mission-control/issues/7) | done |
+| T8 | Web UI showcase SPA | FR-21 | `fe-programmer` | T2, T4, T5, T6 | [#8](https://github.com/leslielee888888/mission-control/issues/8) | done |
+| T9 | Seed data, README, end-to-end verification | FR-19 | `python-programmer` | T7 | [#9](https://github.com/leslielee888888/mission-control/issues/9) | done |
+| T10 | Transcript packaging | — | Leslie | T9 | [#10](https://github.com/leslielee888888/mission-control/issues/10) | done |
+
+## 13. Refinement log`; not tracked as GitHub issues, since they postdate Development)
+
+Milestone: [Mission Control](https://github.com/leslielee888888/mission-control/milestone/1) (10/10 closed) ·
+Project: [Mission Control](https://github.com/leslielee888888/mission-control/projects/8) (owner: leslielee888888)
+
+| ID | Task | Reqs | Owner | Depends on | Issue | Status |
+|----|------|------|-------|------------|-------|--------|
+| T1 | Scaffold — project layout, DB models, seed skeleton, error handling | FR-20 | `python-programmer` | — | [#1](https://github.com/leslielee888888/mission-control/issues/1) | done |
+| T2 | Auth + RBAC + tenant scoping | FR-1, FR-2, FR-3 | `python-programmer` | T1 | [#2](https://github.com/leslielee888888/mission-control/issues/2) | done |
+| T3 | Crew management — profile, skills, availability | FR-4, FR-5, FR-6, FR-7 | `python-programmer` | T2 | [#3](https://github.com/leslielee888888/mission-control/issues/3) | done |
+| T4 | Mission lifecycle + approval gate | FR-8, FR-9, FR-10, FR-11, FR-12, FR-17 | `python-programmer` | T2 | [#4](https://github.com/leslielee888888/mission-control/issues/4) | done |
+| T5 | Matching engine — retrieval + ranking | FR-13 | `python-programmer` | T3, T4 | [#5](https://github.com/leslielee888888/mission-control/issues/5) | done |
+| T6 | Assignments — propose, respond, double-booking guard | FR-14, FR-15, FR-16 | `python-programmer` | T5 | [#6](https://github.com/leslielee888888/mission-control/issues/6) | done |
+| T7 | CLI (`missionctl`) — full workflow coverage | FR-18 | `python-programmer` | T2, T3, T4, T5, T6 | [#7](https://github.com/leslielee888888/mission-control/issues/7) | done |
+| T8 | Web UI showcase SPA | FR-21 | `fe-programmer` | T2, T4, T5, T6 | [#8](https://github.com/leslielee888888/mission-control/issues/8) | done |
+| T9 | Seed data, README, end-to-end verification | FR-19 | `python-programmer` | T7 | [#9](https://github.com/leslielee888888/mission-control/issues/9) | done |
+| T10 | Transcript packaging | — | Leslie | T9 | [#10](https://github.com/leslielee888888/mission-control/issues/10) | done |
 
 ### T1 — Scaffold
 
@@ -564,6 +584,7 @@ nothing here required new code.
 | R-7 | 2026-09-15 | Same Refinement request's third part: remove duplicated docs (`TEST_CREDENTIALS.md` vs `seed_credentials.txt`) and bring the README up to date for a reviewer working cold. | Deleted `TEST_CREDENTIALS.md` (gitignored, never tracked — its two-table local-vs-NAS structure is what caused the login mix-up R-5 didn't anticipate); `seed_credentials.txt` (also gitignored, generated fresh by every seed run) is now the one source of demo credentials. Rewrote `README.md`: Docker quick-start, a "For reviewers" section pointing at the design doc/explainer/transcripts, and a Seed data section written to reference `scripts/seed.py`'s own docstring rather than hardcode counts, so it wouldn't drift when the counts changed (confirmed post-R-6 that it didn't need editing). | No — docs-only. |
 | R-8 | 2026-09-15 | Even after R-7 removed the *duplicated* credentials doc, the underlying mismatch R-5 hit could still recur: `scripts/seed.py` generated a fresh random password per user on every run (`secrets.token_urlsafe`), so local, CI, and the NAS each got their own independent set — the same user's password was never actually the same in two places, only documented in one place per environment. | First pass derived a per-user password deterministically from the email (SHA-256-based); Leslie simplified further — a single static `DEMO_PASSWORD` for every seeded user, since this is pure demo/test data and per-user secrecy buys nothing there, while one fixed password removes lookup entirely. Verified: reseeded locally twice, confirmed the same password both times and across every user; full test suite (137 tests) still green; reseeded the NAS (`docker compose down -v && pull && up -d`) and confirmed `director.dana@northwind.demo` and other users log in with that same fixed password. | No — same seed-time password-generation contract (§10 #24), just static instead of random; no FR changed. |
 | R-9 | 2026-09-15 | Leslie found a genuine gap while testing as a Mission Lead: the backend and CLI already let Mission Lead (or Director) create missions (`require_role(Role.DIRECTOR, Role.MISSION_LEAD)` on `POST /missions`), but the SPA had no "New Mission" affordance at all — `MissionListScreen` had no create button and the API client never wired up a `create` call. Not a permissions bug; the SPA's Q16/Q17 "not full CLI parity" scope had simply never covered mission creation, for either role. | Added `api.mission.create` to the client, a new `MissionCreateScreen` (name/description/start/end date, client-side end>=start validation mirroring the API's own check), and a "New Mission" button on `MissionListScreen`; wired into `App.tsx` as a third state alongside the missions list/detail (still no router, per §7's "no routing depth"), landing on the new mission's detail screen on success. Verified live in the browser, logged in as a Mission Lead (not a Director): created a mission end to end, watched it appear in the list (count 10→11, Draft 2→3). Typecheck, lint, and the full backend test suite (137 tests) all green. Rolling it out to the NAS surfaced a process gap R-4/R-5 hadn't caught: `docker-publish.yml` only ever builds the web image's `:latest`/`:<sha>` tags (pointed at `localhost` for local dev); the NAS's `:nas` tag — `VITE_API_BASE_URL` baked to the NAS's own LAN address — was a one-off manual build during R-5 that CI never touches again. So a NAS `docker compose pull` after a pure SPA change silently keeps serving the *old* bundle. Built and pushed a fresh `:nas` image by hand this time (confirmed the baked URL first by inspecting the running container's own JS bundle, not by guessing) and confirmed the new bundle landed. Documenting this so the next SPA-touching change doesn't quietly ship code to the NAS that isn't actually there — a proper fix (a second CI job building `:nas` with its own `VITE_API_BASE_URL`) is a reasonable follow-up but out of scope for this Refinement pass. | No — closes a scope gap in the SPA, doesn't change any FR or the API/CLI (which already supported this). |
+| R-10 | 2026-09-16 | Finalize's `/code-review high` on PR #22 (the whole `feature/mission-control` → `main` diff, 129 files) — 10 findings after verification; 2 refuted (a duplicate-error-class false positive with no live cross-module catch mismatch, and R-8's static demo password, which was an explicitly discussed and accepted decision, not an unflagged one). | Fixed the real, cheap ones directly: `cli/main.py`'s `_load_session` now treats a corrupted `session.json` as "no session" instead of crashing with a raw traceback (+ a test); `docker-publish.yml` now only moves the `:latest` tag on `main` (`docker/metadata-action`'s `is_default_branch`) — every push still gets an immutable `:<sha>` tag, but a feature-branch push no longer clobbers what a NAS `docker compose pull` lands on; `AuthContext`'s auto-logout effect now checks specifically for a 401 instead of firing on any `whoami` error (a transient network blip or backend 500 was force-logging-out a validly-authenticated user); `App.tsx`'s role routing now explicitly allow-lists `director`/`mission_lead` instead of routing "anything that isn't `crew_member`" to the privileged app; `MissionDetailScreen`'s approve/reject and `MyAssignmentsScreen`'s accept/decline now also invalidate the queries they were leaving stale (the missions list; the affected mission's own detail/fulfillment); `MissionCreateScreen`'s subtitle no longer promises an add-requirement/submit UI that doesn't exist in this showcase — points at the CLI instead. The three concurrent-request race findings (headcount/double-booking/availability-overlap guards) are architecturally deeper — logged as new open question Q27 rather than fixed, same treatment Q26 got. | No — all fixes are bug fixes within already-agreed behavior (no FR's intent changed); Q27 is a genuinely new open question, not a scope change. |
 
 ## 14. Discovery grilling log
 

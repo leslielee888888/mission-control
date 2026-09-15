@@ -121,9 +121,16 @@ export default function App() {
 
   // Role-conditional nav off the logged-in user's role (§10 #23, extended
   // for T8b): Director/Mission Lead get Missions/Crew/Skills; Crew Member
-  // gets My Assignments/My Profile.
+  // gets My Assignments/My Profile. Explicitly allow-listing the privileged
+  // roles (rather than "anything that isn't crew_member") means a missing
+  // or unrecognized role falls through to the login screen, not the
+  // privileged app — belt-and-suspenders alongside the API's own
+  // server-side RBAC, which is the actual enforcement boundary.
+  if (user.role === "director" || user.role === "mission_lead") {
+    return <DirectorLeadApp />;
+  }
   if (user.role === "crew_member") {
     return <CrewMemberApp />;
   }
-  return <DirectorLeadApp />;
+  return <LoginScreen />;
 }
