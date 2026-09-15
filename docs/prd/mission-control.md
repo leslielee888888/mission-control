@@ -110,8 +110,10 @@ which matters when a mission is questioned after the fact.
   CLI/API state is the source of truth; a crew member checks it, they aren't paged.
 - Multi-role users, org-to-org collaboration, or missions spanning multiple
   organisations.
-- Deployment/hosting — this runs locally against SQLite; there is no NAS/cloud target
-  for a take-home challenge.
+- **Hosted** deployment — this runs locally against SQLite; there is no NAS/cloud target
+  for a take-home challenge. Containerized and CI-gated (R-4, Refinement — see §8) is
+  not the same claim as hosted: the images build and run, nothing is actually deployed
+  anywhere persistent.
 
 ## 4. Users & use cases
 
@@ -226,9 +228,10 @@ but only the former needs test evidence.
   impossible to write a query that accidentally spans tenants; a dedicated test suite
   (§6 FR-1) asserts this at the API boundary, not just the ORM layer.
 - **Local runnability.** SQLite file-based storage, no external services (no Postgres,
-  no Redis, no Docker requirement) — a fresh checkout runs with a documented
-  `pip install` + one seed command + one run command. A `Dockerfile`/compose file is a
-  nicety, not the primary path, since the brief asks for "easy to run locally." SQLite
+  no Redis, no Docker *requirement*) — a fresh checkout still runs with just a
+  documented `pip install` + one seed command + one run command; Docker (R-4,
+  Refinement) is available, not mandatory, since the brief asks for "easy to run
+  locally" and a bare-metal checkout is the simpler path to that. SQLite
   (not a habitual database default) fits because the domain is genuinely relational —
   orgs, users, crew, skills, missions, requirements, and assignments with real foreign
   keys and joins — not because a data store was reached for out of convention.
@@ -546,6 +549,7 @@ nothing here required new code.
 | R-1 | 2026-09-15 | FR-13's availability-margin scoring factor had no defined formula — §10 #9 fixed only the three weights (50/30/20), not how margin itself is computed. T5 had to define one to ship. | Documented the exact formula (`min(gap_days, 30) / 30`) in FR-13's acceptance criteria, referencing `services/matcher.py`. | No — implementation already correct; PRD just hadn't caught up. |
 | R-2 | 2026-09-15 | CORS was never addressed anywhere in the Discovery-stage PRD, since nothing before T8 was a browser client. T8 hit a hard blocker (every API call 405'd on preflight) until it was added. | Added a §8 Constraints bullet documenting CORS is enabled wide-open, with the reasoning (bearer token in a header, not a cookie — no ambient credential a stricter allowlist would protect). | No — same reasoning, just undocumented until now. |
 | R-3 | 2026-09-15 | FR-14 doesn't say whether proposing the same crew member twice on one requirement should be blocked. T6 flagged it rather than silently deciding; today it's allowed, consuming two headcount slots for one person. | Added as a new open question, §10 Q26 — genuinely undecided, not folded into a "correct by default" answer. | No — not material enough to block Finalize; Leslie's call whenever it's convenient, a small guard if the answer is "block it." |
+| R-4 | 2026-09-15 | Post-Refinement request: a CI gate (lint + test on every PR) and Docker images for the API and SPA, published to a registry. Not part of the original Discovery-stage scope — §3/§8 had explicitly framed Docker as optional and deployment as fully out of scope. | Added `.github/workflows/ci.yml` (ruff+pytest, oxlint+tsc+vite build, gating PRs into `main`/`feature/mission-control`) and `.github/workflows/docker-publish.yml` (builds + pushes `Dockerfile`/`web/Dockerfile` to GHCR on push, using the built-in `GITHUB_TOKEN` — no new secrets/accounts). Both images built and run-verified locally before commit. §3 and §8 reworded: containerized/CI-gated is not the same claim as hosted — still no live deployment target. | No — additive tooling, doesn't change any FR; committed directly to `feature/mission-control`, same as R-1/R-2/R-3. |
 
 ## 14. Discovery grilling log
 
