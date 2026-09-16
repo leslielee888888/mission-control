@@ -1081,7 +1081,11 @@ def _skill_id(skills_by_name: dict[str, Skill], name: str) -> int:
 
 def _report(credentials: list[SeededCredential]) -> None:
     lines = [
-        "Mission Control demo credentials (generated fresh this run):",
+        "Mission Control demo credentials (deterministic -- same on every run; see"
+        " README's Demo credentials section):",
+        "Intentionally-fake demo credentials for a LAN-only take-home demo instance"
+        " -- committed on purpose, not a leaked secret. Secret-scanning alert on"
+        " this file? See the PRD's Refinement log (R-13) for why.",
         "",
         f"{'ORG':<28} {'ROLE':<13} {'NAME':<16} {'EMAIL':<32} PASSWORD",
     ]
