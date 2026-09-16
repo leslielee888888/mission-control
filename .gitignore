@@ -8,7 +8,13 @@ venv/
 .ruff_cache/
 *.egg-info/
 .env
-seed_credentials.txt
+
+# seed_credentials.txt is deliberately NOT ignored (see README's Demo
+# credentials section) - since R-8 every user's password is the same fixed
+# DEMO_PASSWORD and every email is a hardcoded literal in scripts/seed.py,
+# so this file's content is fully deterministic: byte-for-byte identical on
+# every run, on any machine. Committing it is what makes the demo
+# credentials visible in the repo itself, not just in a README table.
 
 # Leftover git worktree directories from subagent task dispatch (this
 # session's own tooling, not part of the project) - never part of the repo.

@@ -49,8 +49,11 @@ from services.auth import hash_password
 from services.crew import add_availability_window, create_org_skill, set_crew_skill_proficiency
 from services.mission import add_requirement, create_mission, execute_mission_transition
 
-#: Where demo credentials are written (gitignored — see README.md). Also
-#: printed to stdout on every run.
+#: Where demo credentials are written — committed to the repo, not
+#: gitignored (see README.md's Demo credentials section): every password is
+#: the same fixed DEMO_PASSWORD and every email a hardcoded literal below,
+#: so this file's content is fully deterministic and safe to check in.
+#: Also printed to stdout on every run.
 CREDENTIALS_FILE = Path(__file__).resolve().parent.parent / "seed_credentials.txt"
 
 
