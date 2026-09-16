@@ -106,13 +106,15 @@ here deliberately brief so this doesn't drift out of sync with the script.)
 Every seeded user's password is the same fixed string, `MissionControl2026!`
 (`scripts/seed.py`'s `DEMO_PASSWORD`) — deliberate: this is demo/test data, so
 per-user secrecy buys nothing, and one password means no lookup is ever needed for
-any user, in any environment. (You won't find a credentials file in this repo —
-there isn't one to find: `seed_credentials.txt`, the seed script's own
-`email -> password` printout, is gitignored, regenerated fresh by every run, and
-was never committed. The password above is the actual, current one regardless.)
+any user, in any environment. Every email is likewise a hardcoded literal in
+`scripts/seed.py`, so the whole `email -> password` table is fully deterministic —
+byte-for-byte identical on every run, on any machine — which is why, unlike most
+seed scripts' output, [`seed_credentials.txt`](seed_credentials.txt) is committed
+to this repo rather than gitignored: it's the actual, current list, not a stale
+snapshot from whoever last ran the script.
 
-A few accounts to sign in as, one per role (full list in `scripts/seed.py`, or
-`seed_credentials.txt` after seeding):
+A few accounts to sign in as, one per role (full list in
+[`seed_credentials.txt`](seed_credentials.txt)):
 
 | Org | Role | Email |
 |---|---|---|
