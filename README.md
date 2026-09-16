@@ -58,9 +58,9 @@ docker compose up -d
 
 - API: `http://localhost:8100`
 - SPA: `http://localhost:8101`
-- Demo credentials: printed by the seed step on first start —
-  `docker compose logs api | grep -A 999 "demo credentials"` (or see `seed_credentials.txt`
-  inside the container: `docker compose exec api cat seed_credentials.txt`)
+- Demo credentials: **every** seeded user's password is `MissionControl2026!` (see
+  [Demo credentials](#demo-credentials) below) — for a Director account, sign in as
+  `director.dana@northwind.demo`.
 
 Ports are configurable via `.env` (copy `.env.example`) if `8100`/`8101` collide with
 something else on your machine.
@@ -103,11 +103,23 @@ here deliberately brief so this doesn't drift out of sync with the script.)
 
 ### Demo credentials
 
-The seed script generates a real, random password for every user (never blank) and:
+Every seeded user's password is the same fixed string, `MissionControl2026!`
+(`scripts/seed.py`'s `DEMO_PASSWORD`) — deliberate: this is demo/test data, so
+per-user secrecy buys nothing, and one password means no lookup is ever needed for
+any user, in any environment. (You won't find a credentials file in this repo —
+there isn't one to find: `seed_credentials.txt`, the seed script's own
+`email -> password` printout, is gitignored, regenerated fresh by every run, and
+was never committed. The password above is the actual, current one regardless.)
 
-- prints an `email -> password` table to stdout at the end of the run, and
-- writes the same table to `seed_credentials.txt` at the repo root (gitignored —
-  never committed).
+A few accounts to sign in as, one per role (full list in `scripts/seed.py`, or
+`seed_credentials.txt` after seeding):
+
+| Org | Role | Email |
+|---|---|---|
+| Northwind Disaster Response | Director | `director.dana@northwind.demo` |
+| Northwind Disaster Response | Mission Lead | `lead.marcus@northwind.demo` |
+| Northwind Disaster Response | Crew Member | `sam.rivera@northwind.demo` |
+| Beacon Relief Network | Director | `director.elena@beacon.demo` |
 
 ## Using the CLI
 
