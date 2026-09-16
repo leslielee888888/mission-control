@@ -1,0 +1,42 @@
+# Fast-path trigger for the PR Review Dashboard (PRD v2, FR-2).
+#
+# Runs on the self-hosted runner that lives on Leslie's LAN (docker-compose
+# `actions-runner` service, label `pr-review-trigger`) and makes ONE call to the
+# dashboard's trigger endpoint. No checkout, no build — the dashboard fetches
+# the diff itself over the GitHub API. If this job fails (runner offline,
+# endpoint down) nothing is lost: the poller still picks the PR up on its next
+# cycle. Drafts are excluded by the event filter + the `draft == false` guard,
+# matching the poller's own draft exclusion (FR-1).
+name: PR review trigger
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions: {}
+
+jobs:
+  trigger:
+    if: github.event.pull_request.draft == false
+    runs-on: [self-hosted, pr-review-trigger]
+    timeout-minutes: 2
+    steps:
+      - name: Enqueue review on the dashboard
+        env:
+          TRIGGER_URL: ${{ vars.PR_REVIEW_TRIGGER_URL }}
+          TRIGGER_TOKEN: ${{ secrets.PR_REVIEW_TRIGGER_TOKEN }}
+          OWNER: ${{ github.event.repository.owner.login }}
+          REPO: ${{ github.event.repository.name }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -eu
+          : "${TRIGGER_URL:?set the PR_REVIEW_TRIGGER_URL repository variable, e.g. http://192.168.1.176:8000/api/trigger}"
+          : "${TRIGGER_TOKEN:?set the PR_REVIEW_TRIGGER_TOKEN repository secret}"
+          body=$(printf '{"owner":"%s","repo":"%s","number":%s}' "$OWNER" "$REPO" "$NUMBER")
+          echo "POST $TRIGGER_URL for $OWNER/$REPO#$NUMBER"
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $TRIGGER_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$body" \
+            "$TRIGGER_URL"
+          echo
