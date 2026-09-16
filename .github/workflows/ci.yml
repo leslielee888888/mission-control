@@ -1,16 +1,23 @@
 name: CI
 
-# The PR review gate: every pull request into main or feature/mission-control
-# must pass lint + tests for both the backend and the showcase SPA before it
-# can merge. Mirrors exactly what every task in this build already ran by
-# hand (ruff check/format, pytest; tsc -b + oxlint + vite build) - this just
-# makes it enforced instead of self-reported.
+# The PR review gate: every pull request into main or a feature/<prd-slug>
+# branch must pass lint + tests for both the backend and the showcase SPA
+# before it can merge. Mirrors exactly what every task in this build already
+# ran by hand (ruff check/format, pytest; tsc -b + oxlint + vite build) -
+# this just makes it enforced instead of self-reported.
+#
+# `feature/**` (not the literal `feature/mission-control`) so this doesn't
+# need editing for every future PRD's feature branch - the delivery
+# workflow's branch shape is `main <- feature/<slug> <- task/<slug>-t<n>`,
+# generically, not just this one build's slug. A `pull_request`'s branch
+# filter matches its *base* branch, so a task/<slug>-t<n> -> feature/<slug>
+# PR is already covered without task/** needing to be listed here too.
 
 on:
   pull_request:
-    branches: [main, feature/mission-control]
+    branches: [main, "feature/**"]
   push:
-    branches: [main, feature/mission-control]
+    branches: [main, "feature/**"]
 
 jobs:
   backend:
