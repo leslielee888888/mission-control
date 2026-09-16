@@ -143,6 +143,14 @@ ruff format --check .
 
 ## CI / Docker images
 
-Every PR and push to `main`/`feature/mission-control` runs the same checks above
+Every PR and push to `main` or a `feature/**` branch runs the same checks above
 (`.github/workflows/ci.yml`) plus builds and publishes the API and SPA images to GHCR
 (`.github/workflows/docker-publish.yml`) — see PRD §8/§13 (R-4) for why.
+
+`.github/workflows/pr-review-trigger.yml` is a Leslie-side operational detail, not
+part of the submission: an optional fast-path notifier to his personal PR-review
+tooling on a self-hosted runner he controls. It needs `PR_REVIEW_TRIGGER_URL` /
+`PR_REVIEW_TRIGGER_TOKEN` repo secrets and that runner online to do anything; absent
+either, the job just fails harmlessly (`continue-on-error: true`, never a required
+check) — see the file's own header comment for the full security reasoning
+(this repo being public is exactly why it's guarded the way it is).
