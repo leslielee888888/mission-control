@@ -8,9 +8,15 @@ isolated from every other org's).
 
 - **Design doc:** [`docs/prd/mission-control.md`](docs/prd/mission-control.md) — the
   full requirements, architecture decisions, and open-question log.
-- **Fast architecture read:** [`docs/design/architecture-explainer.html`](docs/design/architecture-explainer.html)
-  — open it in a browser for the stack choices, the data model, the design patterns,
-  and the layered request flow in a few minutes, instead of the PRD's full detail.
+- **Fast architecture read:** [live artifact](https://claude.ai/code/artifact/e14d23aa-0235-4a6d-9bee-1be3edaa7895)
+  (source: [`docs/design/architecture-explainer.html`](docs/design/architecture-explainer.html))
+  — opens straight in a browser, no clone needed, for the stack choices, the data
+  model, the design patterns, and the layered request flow in a few minutes, instead
+  of the PRD's full detail.
+- **SPA mockups:** [live artifact](https://claude.ai/code/artifact/de0b0bf5-d39d-4a2b-8392-1ac4339bd93a)
+  (source: [`docs/design/spa-mockups/`](docs/design/spa-mockups/)) — the 4 screens
+  (login, mission list, mission detail w/ matcher + approval, my assignments) as
+  designed before `web/` was built.
 
 ## For reviewers
 
@@ -28,8 +34,8 @@ Everything the brief asks for lives in this repo:
 
 The fastest way to explore: run the [Docker quick start](#quick-start-docker) below,
 which needs nothing but Docker and gives you a populated instance in under a minute —
-or open `docs/design/architecture-explainer.html` first for the five-minute version of
-the whole system before touching any code.
+or open the [architecture explainer artifact](https://claude.ai/code/artifact/e14d23aa-0235-4a6d-9bee-1be3edaa7895)
+first for the five-minute version of the whole system before touching any code.
 
 ## Stack
 
