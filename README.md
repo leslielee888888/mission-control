@@ -149,8 +149,12 @@ Every PR and push to `main` or a `feature/**` branch runs the same checks above
 
 `.github/workflows/pr-review-trigger.yml` is a Leslie-side operational detail, not
 part of the submission: an optional fast-path notifier to his personal PR-review
-tooling on a self-hosted runner he controls. It needs `PR_REVIEW_TRIGGER_URL` /
-`PR_REVIEW_TRIGGER_TOKEN` repo secrets and that runner online to do anything; absent
-either, the job just fails harmlessly (`continue-on-error: true`, never a required
-check) — see the file's own header comment for the full security reasoning
-(this repo being public is exactly why it's guarded the way it is).
+tooling on a self-hosted runner he controls (needs `curl` and `jq`). It needs the
+`PR_REVIEW_TRIGGER_URL` repository **variable**, the `PR_REVIEW_TRIGGER_TOKEN`
+repository **secret** (different tabs under Settings > Secrets and variables >
+Actions — mixing them up leaves the trigger silently non-functional), and that
+runner online to do anything; absent any of those, the job just fails harmlessly
+(`continue-on-error: true`, never a required check). Since this repo is public,
+its "Fork pull request workflows" setting is `all_external_contributors` — every
+non-owner PR holds for manual approval before any workflow (this one included)
+runs — see the file's own header comment for the full reasoning.

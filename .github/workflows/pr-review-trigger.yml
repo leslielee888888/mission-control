@@ -1,31 +1,34 @@
 # Fast-path trigger for the PR Review Dashboard (PRD v2, FR-2).
 #
 # Runs on the self-hosted runner that lives on Leslie's LAN (docker-compose
-# `actions-runner` service, label `pr-review-trigger`) and makes ONE call to the
-# dashboard's trigger endpoint. No checkout, no build — the dashboard fetches
-# the diff itself over the GitHub API. If this job fails (runner offline,
-# endpoint down) nothing is lost: the poller still picks the PR up on its next
-# cycle, so this is never a required check (continue-on-error, and never add
-# it to branch protection).
+# `actions-runner` service, label `pr-review-trigger`; needs `curl` and `jq`
+# on that runner) and makes ONE call to the dashboard's trigger endpoint. No
+# checkout, no build — the dashboard fetches the diff itself over the GitHub
+# API. If this job fails (runner offline, endpoint down, `jq`/`curl` missing)
+# nothing is lost: the poller still picks the PR up on its next cycle, so
+# this is never a required check (continue-on-error, and never add it to
+# branch protection).
 #
 # SECURITY — this repo is PUBLIC, unlike ai-docs/leslie-awesome-skills (this
 # pattern's origin), which are private. A self-hosted runner on `pull_request`
 # is a known arbitrary-code-execution vector on a public repo: for that
 # event, GitHub evaluates the workflow file FROM THE PR's OWN HEAD REF, so a
-# fork PR can rewrite this file's steps (or the `if:` guard below) and have
-# them run on this LAN-connected runner. Two layers, since the in-file guard
-# alone is attacker-editable in exactly this scenario:
-#  1. GitHub's own platform gate (not configurable weaker on a personal
-#     account's public repo): a first-time contributor's workflow run is
-#     always held for manual approval in the Actions tab, evaluated BEFORE
-#     any job dispatches — this is the real backstop, independent of
-#     anything in this file.
-#  2. Defense in depth below: `head.repo.full_name == github.repository`
-#     skips any PR whose head branch isn't in this same repo (i.e. any
-#     fork), so a repeat contributor's fork PR (past the one-time approval
-#     gate) still can't reach the runner. Kept even though a sufficiently
-#     motivated repeat contributor could edit this guard out of their own
-#     fork's copy — it stops everything else.
+# fork PR can rewrite this file's steps — including the `if:` guard below —
+# and have them run on this LAN-connected runner. That makes the in-file
+# guard alone worthless against a determined attacker (they just delete it
+# in their own fork's copy); the real control is platform-level, not
+# anything this file can enforce on its own:
+#   Settings > Actions > General > "Fork pull request workflows from outside
+#   collaborators" is set to `all_external_contributors` (the repo's
+#   fork-pr-contributor-approval policy) — EVERY non-owner PR, first-time or
+#   repeat contributor alike, holds for Leslie's manual approval in the
+#   Actions tab before any job (this one included) ever dispatches. This is
+#   evaluated by GitHub's own infrastructure before the workflow file is even
+#   read, so a fork can't edit its way past it the way it could an in-file
+#   condition.
+# `head.repo.full_name == github.repository` below is kept anyway as cheap
+# defense in depth (skip, don't even queue for approval, on same-repo PRs
+# only) — but the approval policy above is what actually closes this.
 name: PR review trigger
 
 on:
@@ -35,7 +38,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: pr-review-trigger-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -71,10 +74,11 @@ jobs:
           # error) is discarded rather than echoed; the exit code is enough
           # to know whether the call landed.
           curl --fail-with-body --silent --show-error --max-time 30 \
-            --retry 2 --retry-delay 2 --retry-connrefused \
+            --retry 2 --retry-delay 2 --retry-connrefused --retry-max-time 20 \
             -H "Authorization: Bearer $TRIGGER_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$body" \
             -o /dev/null \
+            -w 'http_status=%{http_code}\n' \
             "$TRIGGER_URL"
           echo "enqueued"
